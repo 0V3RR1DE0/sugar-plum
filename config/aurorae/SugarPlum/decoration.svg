@@ -548,5 +548,5 @@
          class="ColorScheme-Background" />
     </g>
     </g>
-<g id="sugar-plum-dots"><circle cx="20" cy="24" r="9" fill="#ffb3d9" stroke="#1e1e2e" stroke-opacity=".45" stroke-width="1.5"/><circle cx="42" cy="24" r="9" fill="#f7e1b5" stroke="#1e1e2e" stroke-opacity=".45" stroke-width="1.5"/><circle cx="64" cy="24" r="9" fill="#b8e6c8" stroke="#1e1e2e" stroke-opacity=".45" stroke-width="1.5"/></g>
+<g id="sugar-plum-dots"><circle cx="14" cy="22" r="6" fill="#ffb3d9" stroke="#1e1e2e" stroke-opacity=".45" stroke-width="1"/><circle cx="28" cy="22" r="6" fill="#f7e1b5" stroke="#1e1e2e" stroke-opacity=".45" stroke-width="1"/><circle cx="42" cy="22" r="6" fill="#b8e6c8" stroke="#1e1e2e" stroke-opacity=".45" stroke-width="1"/></g>
 </svg>
