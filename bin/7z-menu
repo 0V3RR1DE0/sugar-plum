@@ -1,89 +1,136 @@
 #!/usr/bin/env bash
-# Sugar Plum 7z actions, launched from Dolphin/KIO.
+# Sugar Plum quick archive actions, launched from Dolphin/KIO.
+# Every operation re-opens in a terminal so the 7z/unrar/tar output is live.
 set -uo pipefail
 
-log="/tmp/sugar-7z-$$.log"
+if [ "${SUGAR_7Z_TERM:-0}" != "1" ]; then
+  export SUGAR_7Z_TERM=1
+  for term in ghostty konsole xterm; do
+    command -v "$term" >/dev/null 2>&1 || continue
+    case "$term" in
+      ghostty) exec ghostty -e "$0" "$@" ;;
+      konsole) exec konsole -e "$0" "$@" ;;
+      xterm)   exec xterm -e "$0" "$@" ;;
+    esac
+  done
+fi
+
 mode="${1:-}"
 shift || true
+files=("$@")
+[ "${#files[@]}" -gt 0 ] || exit 0
 
+notify() { command -v notify-send >/dev/null 2>&1 && notify-send -a "Sugar Plum" "$@" >/dev/null 2>&1 || true; }
 have() { command -v "$1" >/dev/null 2>&1; }
-notify() { have notify-send && notify-send -a "Sugar Plum" "$@" || true; }
-ask_text() { zenity --entry --title="7z" --text="$1" --entry-text="$2" 2>/dev/null; }
-ask_yes() { zenity --question --title="7z" --text="$1" 2>/dev/null; }
-ask_pass() { zenity --password --title="7z password" 2>/dev/null; }
 
 fail() {
-  notify -u critical -i dialog-error "7z failed" "$1"
-  if have zenity && [ -s "$log" ]; then
-    zenity --text-info --title="7z failed" --filename="$log" --width=760 --height=420 2>/dev/null || true
-  fi
+  echo
+  echo "✗ $*"
+  notify -u critical -i dialog-error "Archive failed" "$*"
+  echo
+  read -r -p "Press Enter to close…" _ || true
   exit 1
 }
 
-have 7z || fail "The 7z binary is not installed."
-
-run_progress() {
-  local title="$1"; shift
-  if have zenity; then
-    "$@" 2>"$log" | zenity --progress --pulsate --auto-close --no-cancel --title="$title" 2>/dev/null
-    return "${PIPESTATUS[0]}"
+ask_pass() {
+  local p1 p2
+  p1="$(zenity --password --title="Archive password" 2>/dev/null)" || return 1
+  [ -n "$p1" ] || return 1
+  p2="$(zenity --password --title="Confirm password" 2>/dev/null)" || return 1
+  if [ "$p1" != "$p2" ]; then
+    zenity --error --title="Passwords" --text="The passwords do not match." 2>/dev/null || true
+    return 1
   fi
-  "$@" 2>"$log"
+  printf '%s' "$p1"
 }
 
-abs() {
-  local p="$1"
-  if [ -e "$p" ]; then readlink -f -- "$p"; else printf '%s\n' "$p"; fi
+strip_archive_ext() {
+  local b="$1"
+  case "$b" in
+    *.tar.gz|*.tar.xz|*.tar.zst|*.tar.bz2) b="${b%.*.*}" ;;
+    *.tgz|*.txz|*.tbz2) b="${b%.*}" ;;
+    *) b="${b%.*}" ;;
+  esac
+  printf '%s' "$b"
+}
+
+unique_out() {
+  local dir="$1" base="$2" ext="$3" out i=2
+  out="$dir/$base.$ext"
+  while [ -e "$out" ]; do
+    out="$dir/$base-$i.$ext"
+    i=$((i + 1))
+  done
+  printf '%s' "$out"
 }
 
 compress() {
-  local ext="$1" level="$2" want_pass="$3"; shift 3
-  local -a files=("$@")
-  [ "${#files[@]}" -gt 0 ] || exit 0
+  local fmt="$1" want_pass="$2"; shift 2
+  local -a src=("$@")
+  [ "${#src[@]}" -gt 0 ] || fail "Nothing selected."
 
-  local first dir base default name out pass="" args=()
-  first="$(abs "${files[0]}")"
+  local first dir base ext="7z" pass=""
+  first="$(readlink -f -- "${src[0]}")"
   dir="$(dirname -- "$first")"
   base="$(basename -- "$first")"
-  if [ "${#files[@]}" -eq 1 ] && [ ! -d "$first" ]; then
+  if [ "${#src[@]}" -eq 1 ] && [ ! -d "$first" ]; then
     base="${base%.*}"
+  elif [ "${#src[@]}" -gt 1 ]; then
+    base="$(basename -- "$PWD")"
+    [ "$base" = "/" ] && base="Archive"
   fi
   [ -n "$base" ] || base="Archive"
-  default="$base.$ext"
 
-  name="$(ask_text "Archive name" "$default")" || exit 0
-  [ -n "$name" ] || exit 0
-  name="$(basename -- "$name")"
-  case "${name,,}" in
-    *."$ext") ;;
-    *) name="$name.$ext" ;;
+  case "$fmt" in
+    7z) ext="7z" ;;
+    zip) ext="zip" ;;
+    targz) ext="tar.gz" ;;
+    tar) ext="tar" ;;
+    rar) ext="rar"; have rar || fail "Creating RAR needs the proprietary 'rar' package; extraction already works through unrar." ;;
   esac
-  out="$dir/$name"
-
-  if [ -e "$out" ]; then
-    ask_yes "$name already exists. Replace it?" || exit 0
-    rm -f -- "$out" || fail "Could not replace $name."
-  fi
 
   if [ "$want_pass" = "1" ]; then
     pass="$(ask_pass)" || exit 0
     [ -n "$pass" ] || exit 0
-    args+=(-p"$pass" -mhe=on)
   fi
 
-  args+=(-t"$ext" -mx="$level" -mmt=on -y)
-  notify -i package-x-generic "Compressing" "$name"
-  if run_progress "Compressing $name" 7z a "${args[@]}" -- "$out" "${files[@]}"; then
-    notify -i package-x-generic "Compressed" "$out"
-  else
-    fail "Could not create $name."
-  fi
+  local out; out="$(unique_out "$dir" "$base" "$ext")"
+  local -a names=()
+  local f
+  for f in "${src[@]}"; do names+=("$(basename -- "$f")"); done
+
+  echo "→ ${base}.${ext}"
+  notify "Compressing" "${base}.${ext}"
+
+  ( cd "$dir" || exit 1
+    case "$fmt" in
+      7z)
+        local -a args=(-t7z -mx=5 -mmt=on -bsp1 -y)
+        [ -n "$pass" ] && args+=(-p"$pass" -mhe=on)
+        7z a "${args[@]}" "$out" -- "${names[@]}"
+        ;;
+      zip)
+        local -a args=(-tzip -mx=5 -mmt=on -bsp1 -y)
+        [ -n "$pass" ] && args+=(-p"$pass")
+        7z a "${args[@]}" "$out" -- "${names[@]}"
+        ;;
+      targz) tar -czvf "$out" -- "${names[@]}" ;;
+      tar)   tar -cvf  "$out" -- "${names[@]}" ;;
+      rar)
+        local -a args=(a -m5)
+        [ -n "$pass" ] && args+=(-p"$pass")
+        rar "${args[@]}" "$out" "${names[@]}"
+        ;;
+    esac
+  ) || fail "Compression failed."
+
+  notify -i package-x-generic "Compressed" "$out"
 }
 
 extract() {
   local where="$1" want_pass="$2"; shift 2
-  local -a files=("$@")
-  [ "${#files[@]}" -gt 0 ] || exit 0
+  local -a src=("$@")
+  [ "${#src[@]}" -gt 0 ] || fail "Nothing selected."
 
   local pass=""
   if [ "$want_pass" = "1" ]; then
@@ -91,51 +138,58 @@ extract() {
     [ -n "$pass" ] || exit 0
   fi
 
-  local a dir base out count=0
-  for a in "${files[@]}"; do
+  local a dir base out
+  for a in "${src[@]}"; do
+    a="$(readlink -f -- "$a")"
     [ -f "$a" ] || continue
-    a="$(abs "$a")"
     dir="$(dirname -- "$a")"
     base="$(basename -- "$a")"
-    case "$where" in
-      here) out="$dir" ;;
-      folder)
-        case "$base" in
-          *.tar.gz|*.tar.xz|*.tar.zst|*.tar.bz2) out="$dir/${base%.*.*}" ;;
-          *) out="$dir/${base%.*}" ;;
-        esac
-        ;;
-      ask)
-        out="$(zenity --file-selection --directory --title="Extract $base to…" 2>/dev/null)" || exit 0
-        [ -n "$out" ] || exit 0
-        ;;
-      *) exit 1 ;;
-    esac
 
-    mkdir -p -- "$out" || fail "Could not create $out."
-    local -a args=(-aos -y -o"$out")
-    [ -n "$pass" ] && args+=(-p"$pass")
-
-    if run_progress "Extracting $base" 7z x "${args[@]}" -- "$a"; then
-      count=$((count + 1))
+    if [ "$where" = "to" ]; then
+      local suggested; suggested="$dir/$(strip_archive_ext "$base")"
+      out="$(zenity --file-selection --directory --title="Extract $base to…" --filename="$suggested/" 2>/dev/null)" || exit 0
+      [ -n "$out" ] || exit 0
     else
-      fail "Could not extract $base."
+      out="$dir"
     fi
+    mkdir -p -- "$out" || fail "Could not create $out."
+
+    echo "→ extracting $base to $out"
+    notify "Extracting" "$base"
+
+    case "${base,,}" in
+      *.rar)
+        if have unrar; then
+          unrar x -o- -y ${pass:+-p"$pass"} "$a" "$out/" || fail "unrar failed on $base."
+        else
+          7z x -bsp1 -aos -y ${pass:+-p"$pass"} -o"$out" -- "$a" || fail "7z failed on $base."
+        fi
+        ;;
+      *.tar.gz|*.tgz)   tar -xzvf "$a" -C "$out" || fail "tar failed on $base." ;;
+      *.tar.xz|*.txz)   tar -xJvf "$a" -C "$out" || fail "tar failed on $base." ;;
+      *.tar.zst)        tar --zstd -xvf "$a" -C "$out" || fail "tar failed on $base." ;;
+      *.tar.bz2|*.tbz2) tar -xjvf "$a" -C "$out" || fail "tar failed on $base." ;;
+      *.tar)            tar -xvf "$a" -C "$out" || fail "tar failed on $base." ;;
+      *)
+        7z x -bsp1 -aos -y ${pass:+-p"$pass"} -o"$out" -- "$a" || fail "7z failed on $base."
+        ;;
+    esac
   done
 
-  [ "$count" -gt 0 ] && notify -i package-x-generic "Extracted" "$count archive(s)"
+  notify -i package-x-generic "Extracted" "$where"
 }
 
 case "$mode" in
-  compress7z)     compress 7z 5 0 "$@" ;;
-  compress7zmax)  compress 7z 9 0 "$@" ;;
-  compress7zpass) compress 7z 5 1 "$@" ;;
-  compresszip)    compress zip 5 0 "$@" ;;
-  extracthere)    extract here 0 "$@" ;;
-  extractto)      extract folder 0 "$@" ;;
-  extractask)     extract ask 0 "$@" ;;
-  extractpass)    extract ask 1 "$@" ;;
+  7z)        compress 7z 0 "$@" ;;
+  zip)       compress zip 0 "$@" ;;
+  targz)     compress targz 0 "$@" ;;
+  tar)       compress tar 0 "$@" ;;
+  rar)       compress rar 0 "$@" ;;
+  7zpass)    compress 7z 1 "$@" ;;
+  zippass)   compress zip 1 "$@" ;;
+  rarpass)   compress rar 1 "$@" ;;
+  extracthere) extract here 0 "$@" ;;
+  extractto)   extract to 0 "$@" ;;
+  extractpass) extract here 1 "$@" ;;
   *) exit 1 ;;
 esac
-
-rm -f -- "$log"

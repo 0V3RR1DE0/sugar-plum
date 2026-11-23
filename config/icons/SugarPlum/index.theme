@@ -2,7 +2,7 @@
 Name=Sugar Plum
 Comment=Pastel overrides over Papirus-Dark
 Inherits=Papirus-Dark,hicolor
-Directories=scalable/apps
+Directories=scalable/apps,scalable/emblems
 
 [scalable/apps]
 Size=64
@@ -10,3 +10,10 @@ Type=Scalable
 MinSize=16
 MaxSize=512
 Context=Applications
+
+[scalable/emblems]
+Size=16
+Type=Scalable
+MinSize=8
+MaxSize=64
+Context=Emblems

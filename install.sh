@@ -177,6 +177,17 @@ install_catppuccin() {
   ok "Catppuccin Mocha Pink + Classic"
 }
 
+install_cursor() {
+  local dest="$HOME/.local/share/icons/catppuccin-mocha-pink-cursors"
+  backup_once "$HOME/.config/kcminputrc"
+  if [ -e "$dest" ] && [ ! -L "$dest" ]; then rm -rf "$dest"; fi
+  link_file "$REPO/assets/cursors/catppuccin-mocha-pink-cursors" "$dest"
+  kwriteconfig6 --file kcminputrc --group Mouse --key cursorTheme catppuccin-mocha-pink-cursors
+  kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 24
+  command -v plasma-apply-cursortheme >/dev/null 2>&1 && plasma-apply-cursortheme catppuccin-mocha-pink-cursors >/dev/null 2>&1 || true
+  ok "Catppuccin pink cursor"
+}
+
 apply_kde() {
   local f
   for f in kdeglobals kwinrc plasmashellrc plasma-org.kde.plasma.desktop-appletsrc kglobalshortcutsrc; do
@@ -186,6 +197,7 @@ apply_kde() {
   install_fonts
   install_papirus
   install_catppuccin
+  install_cursor
 
   mkdir -p "$HOME/.local/share/color-schemes"
   copy_new "$REPO/config/kde/SugarPlum.colors" "$HOME/.local/share/color-schemes/SugarPlum.colors"
@@ -238,7 +250,7 @@ apply_shells() {
   link_file "$REPO/config/nvim/sugar-plum.lua" "$HOME/.config/nvim/lua/plugins/sugar-plum.lua"
   link_file "$REPO/config/fastfetch/config.jsonc" "$HOME/.config/fastfetch/config.jsonc"
 
-  block_set "$HOME/.config/nushell/config.nu" sugar-plum "source $HOME/.config/nushell/sugar-plum.nu" top
+  block_set "$HOME/.config/nushell/config.nu" sugar-plum "source $HOME/.config/nushell/sugar-plum.nu" bottom
   block_set "$HOME/.config/ghostty/config" sugar-plum "config-file = sugar-plum.conf" bottom
 
   set_ini_key "$HOME/.config/btop/btop.conf" color_theme '"sugar-plum"'
@@ -427,6 +439,7 @@ status() {
 }
 
 revert_all() {
+  "$REPO/bin/desktop-icons" revert 2>/dev/null || true
   say "reverting Sugar Plum (user level)"
   local file
   if [ -f "$BLOCKS" ]; then
@@ -498,6 +511,7 @@ case "${1:-apply}" in
     apply_panel
     apply_wallpaper
     apply_scripts
+    "$REPO/bin/desktop-icons" apply || warn "desktop icon pass skipped"
     ok "Sugar Plum applied"
     warn "log out/in to activate the screenshot shortcuts"
     if [ -e "$REPO/state/system-applied" ]; then

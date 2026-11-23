@@ -2,27 +2,47 @@
 Type=Service
 ServiceTypes=KonqPopupMenu/Plugin
 MimeType=all/allfiles;inode/directory;
-Actions=sevenzip;sevenzipmax;sevenzippass;zip;
-X-KDE-Submenu=7z
+Actions=sevenzip;zip;targz;tar;rar;sevenzippass;zippass;rarpass;
+X-KDE-Submenu=Compress with…
 X-KDE-Priority=TopLevel
-Icon=application-x-7z-compressed
+Icon=package-x-generic
 
 [Desktop Action sevenzip]
-Name=Compress to .7z
+Name=7z
 Icon=application-x-7z-compressed
-Exec=@BIN@ compress7z %F
-
-[Desktop Action sevenzipmax]
-Name=Compress to .7z (maximum)
-Icon=application-x-7z-compressed
-Exec=@BIN@ compress7zmax %F
-
-[Desktop Action sevenzippass]
-Name=Compress to .7z (password)…
-Icon=application-x-7z-compressed
-Exec=@BIN@ compress7zpass %F
+Exec=@BIN@ 7z %F
 
 [Desktop Action zip]
-Name=Compress to .zip
+Name=ZIP
 Icon=application-zip
-Exec=@BIN@ compresszip %F
+Exec=@BIN@ zip %F
+
+[Desktop Action targz]
+Name=tar.gz
+Icon=application-x-compressed-tar
+Exec=@BIN@ targz %F
+
+[Desktop Action tar]
+Name=tar
+Icon=application-x-tar
+Exec=@BIN@ tar %F
+
+[Desktop Action rar]
+Name=RAR (needs rar)
+Icon=application-x-rar
+Exec=@BIN@ rar %F
+
+[Desktop Action sevenzippass]
+Name=7z with password…
+Icon=application-x-7z-compressed
+Exec=@BIN@ 7zpass %F
+
+[Desktop Action zippass]
+Name=ZIP with password…
+Icon=application-zip
+Exec=@BIN@ zippass %F
+
+[Desktop Action rarpass]
+Name=RAR with password… (needs rar)
+Icon=application-x-rar
+Exec=@BIN@ rarpass %F

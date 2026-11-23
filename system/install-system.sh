@@ -50,7 +50,7 @@ apply_login() {
   [ -f /etc/plasmalogin.conf ] || { warn "PLM config not found; skipping login wallpaper"; return; }
   backup_once /etc/plasmalogin.conf plasmalogin.conf
   install -d -m 755 /var/lib/plasmalogin/wallpapers
-  install -m 644 "$REPO/wallpapers/sakura-mirror.jpg" /var/lib/plasmalogin/wallpapers/sugar-plum.jpg
+  install -m 644 "$REPO/wallpapers/plushies.jpg" /var/lib/plasmalogin/wallpapers/sugar-plum.jpg
   rewrite_plasmalogin /etc/plasmalogin.conf
   ok "login wallpaper set"
 }
@@ -60,7 +60,7 @@ apply_limine() {
   command -v limine >/dev/null 2>&1 || { warn "limine binary not found; skipping"; return; }
   backup_once "$ESP/limine.conf" limine.conf
   install -d -m 755 "$ESP/sugar-plum"
-  install -m 644 "$REPO/wallpapers/quiet-moon.jpg" "$ESP/sugar-plum/limine.jpg"
+  install -m 644 "$REPO/wallpapers/carousel.jpg" "$ESP/sugar-plum/limine.jpg"
   install -m 644 "$REPO/system/limine-theme.conf" "$ESP/sugar-plum/limine-theme.conf"
   install -d -m 755 /etc/boot/hooks/post.d
   install -m 755 "$REPO/system/80-sugar-plum-theme" /etc/boot/hooks/post.d/80-sugar-plum-theme

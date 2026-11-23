@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Make desktop launchers translucent and arrow-free.
+# Replaces symlinked .desktop items with real copies pointing at translucent
+# icon files. The shortcut emblem is hidden by SugarPlum's transparent
+# emblem-symbolic-link override.
+set -euo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+DESKTOP="$(xdg-user-dir DESKTOP 2>/dev/null || printf '%s/Desktop' "$HOME")"
+BACKUPS="$REPO/backups/desktop-originals"
+STATE="$REPO/state/desktop.tsv"
+ICONS="$HOME/.local/share/icons/SugarPlum-Desktop"
+OPACITY="0.82"
+MODE="${1:-apply}"
+
+say()  { printf '\033[38;5;218m▸\033[0m %s\n' "$*"; }
+ok()   { printf '\033[38;5;150m✓\033[0m %s\n' "$*"; }
+warn() { printf '\033[38;5;222m!\033[0m %s\n' "$*" >&2; }
+
+backup_once() {
+  local path="$1"
+  [ -f "$STATE" ] && cut -f1 "$STATE" | grep -Fxq -- "$path" && return 0
+  mkdir -p "$BACKUPS"
+  local key; key="$(printf '%s' "$path" | sed 's|/|__|g')"
+  if [ -e "$path" ] || [ -L "$path" ]; then
+    cp -a -- "$path" "$BACKUPS/$key"
+    printf '%s\tbackup\n' "$path" >> "$STATE"
+  else
+    printf '%s\tabsent\n' "$path" >> "$STATE"
+  fi
+}
+
+find_icon() {
+  local name="$1"
+  find -L \
+    "$HOME/.local/share/icons/SugarPlum" \
+    "$HOME/.cache/sugar-plum/papirus/Papirus-Dark" \
+    "$HOME/.cache/sugar-plum/papirus/Papirus" \
+    "/usr/share/icons/hicolor" "/usr/share/icons/Papirus-Dark" "/usr/share/icons/Papirus" \
+    "/var/lib/flatpak/exports/share/icons" \
+    \( -name "$name.svg" -o -name "$name.png" \) -type f -print -quit 2>/dev/null || true
+}
+
+make_translucent() {
+  local src="$1" name="$2"
+  mkdir -p "$ICONS"
+  case "$src" in
+    *.svg)
+      python3 - "$src" "$ICONS/$name.svg" "$OPACITY" <<'PY'
+import re, sys, pathlib
+src, dest, opacity = sys.argv[1:4]
+text = pathlib.Path(src).read_text(errors="replace")
+text = re.sub(r"<svg\b", f'<svg opacity="{opacity}"', text, count=1)
+pathlib.Path(dest).write_text(text)
+PY
+      printf '%s' "$ICONS/$name.svg"
+      ;;
+    *.png)
+      if command -v magick >/dev/null; then
+        magick "$src" -alpha set -channel A -evaluate multiply "$OPACITY" +channel "$ICONS/$name.png" 2>/dev/null || { printf ''; return 0; }
+      else
+        convert "$src" -alpha set -channel A -evaluate multiply "$OPACITY" +channel "$ICONS/$name.png" 2>/dev/null || { printf ''; return 0; }
+      fi
+      printf '%s' "$ICONS/$name.png"
+      ;;
+    *) printf '' ;;
+  esac
+}
+
+apply_desktop() {
+  [ -d "$DESKTOP" ] || return 0
+  mkdir -p "$ICONS"
+  touch "$STATE"
+  local f target name icon src dest tmp
+  for f in "$DESKTOP"/*.desktop; do
+    [ -e "$f" ] || continue
+    backup_once "$f"
+    target="$f"
+    [ -L "$f" ] && target="$(readlink -f "$f")"
+    [ -f "$target" ] || continue
+
+    icon="$(sed -n 's/^Icon=//p' "$target" | head -n1)"
+    dest=""
+    if [ -n "$icon" ]; then
+      src="$(find_icon "$icon")"
+      if [ -n "$src" ]; then
+        dest="$(make_translucent "$src" "$(basename "$f" .desktop)")"
+      fi
+    fi
+
+    if [ -L "$f" ]; then
+      tmp="$(mktemp)"
+      cp "$target" "$tmp"
+      rm -f "$f"
+      cp "$tmp" "$f"
+      rm -f "$tmp"
+      chmod 755 "$f"
+    fi
+    if [ -n "$dest" ]; then
+      sed -i "s|^Icon=.*|Icon=$dest|" "$f"
+    fi
+    say "$(basename "$f") → ${dest:-unchanged icon}"
+  done
+  command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+  ok "desktop icons translucent, shortcut arrows hidden"
+}
+
+revert_desktop() {
+  [ -f "$STATE" ] || return 0
+  local path how key
+  tac "$STATE" 2>/dev/null | while IFS=$'\t' read -r path how; do
+    [ -n "$path" ] || continue
+    key="$(printf '%s' "$path" | sed 's|/|__|g')"
+    if [ "$how" = "backup" ] && [ -e "$BACKUPS/$key" ]; then
+      rm -rf -- "$path"
+      cp -a -- "$BACKUPS/$key" "$path"
+    elif [ "$how" = "absent" ]; then
+      rm -f -- "$path"
+    fi
+  done
+  rm -rf "$ICONS"
+  rm -f "$STATE"
+  command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+  ok "desktop icons restored"
+}
+
+case "$MODE" in
+  apply) apply_desktop ;;
+  revert) revert_desktop ;;
+  *) echo "usage: $0 [apply|revert]" >&2; exit 1 ;;
+esac

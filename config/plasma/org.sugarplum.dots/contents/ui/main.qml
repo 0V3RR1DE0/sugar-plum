@@ -51,6 +51,8 @@ PlasmoidItem {
                     property bool minimized: model.IsMinimized ? true : false
                     property bool running: model.IsWindow ? true : (model.IsGroupParent ? true : ((model.ChildCount || 0) > 0))
                     property bool launcher: model.IsLauncher ? true : false
+                    property bool idleLauncher: model.IsLauncher && label.indexOf("(Launcher)") >= 0
+                    property bool open: !idleLauncher && (model.IsWindow || model.IsGroupParent || (model.ChildCount || 0) > 0 || model.IsLauncher)
                     property string label: model.display || ""
 
                     Rectangle {
@@ -68,36 +70,26 @@ PlasmoidItem {
                         height: 24
                         source: model.decoration
                         smooth: true
-                        opacity: taskItem.minimized ? 0.45 : 1.0
+                        visible: !taskItem.open
+                        opacity: taskItem.minimized ? 0.5 : 1.0
                     }
 
-                    // The app icon stays; when a window is open, this badge
-                    // replaces the usual running indicator with the three dots.
-                    Rectangle {
-                        visible: taskItem.running
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.topMargin: 0
-                        anchors.rightMargin: 0
-                        width: 14
-                        height: 7
-                        radius: 4
-                        color: Qt.rgba(0.10, 0.09, 0.14, 0.88)
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 1
-                            Repeater {
-                                model: 3
-                                Rectangle {
-                                    width: 3.5
-                                    height: 3.5
-                                    radius: 2
-                                    color: ["#ffb3d9", "#f7e1b5", "#b8e6c8"][index]
-                                }
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 5
+                        visible: taskItem.open
+                        Repeater {
+                            model: 3
+                            Rectangle {
+                                width: 7
+                                height: 7
+                                radius: 4
+                                color: ["#ffb3d9", "#f7e1b5", "#b8e6c8"][index]
+                                opacity: taskItem.active ? 1.0 : (taskItem.minimized ? 0.35 : 0.8)
                             }
                         }
                     }
+
 
                     MouseArea {
                         id: mouse
@@ -110,7 +102,7 @@ PlasmoidItem {
                                 tasksModel.requestClose(idx);
                             } else if (taskItem.active) {
                                 tasksModel.requestToggleMinimized(idx);
-                            } else if (taskItem.launcher && !taskItem.running) {
+                            } else if (taskItem.launcher && taskItem.idleLauncher) {
                                 tasksModel.requestNewInstance(idx);
                             } else {
                                 tasksModel.requestActivate(idx);

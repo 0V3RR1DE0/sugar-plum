@@ -19,7 +19,7 @@ that was already in the user's Nushell prompt.
   menu and Papirus candy folders.
 - **Screenshots:** `Print` region, `Shift+Print` full screen, `Alt+Print` active
   window → satty → clipboard + `~/Pictures/Screenshots`.
-- **Wallpapers:** 12 Unsplash images, random every 30 minutes. Sources in
+- **Wallpapers:** 8 comfy Unsplash images, random every 30 minutes. Sources in
   `wallpapers/SOURCES.md`.
 - **Optional system half:** login wallpaper (Plasma Login Manager 6.8 only
   exposes a wallpaper, not a full theme) and a cosmetic Limine boot theme.
@@ -66,13 +66,22 @@ hook runs before the enrollment hook and re-enrolls. Revert:
 pkexec ~/sugar-plum/system/install-system.sh revert
 ```
 
-## Notes and limits
+## Known limits
 
 - The screenshot shortcuts become active after a logout/login (KGlobalAccel
   reads `[services]` at session start).
 - Plasma Login Manager 6.8 only exposes a wallpaper; the greeter remains Breeze.
 - Limine is text-based; the theme is wallpaper + terminal palette + branding.
 - Third-party KWin effects are deliberately avoided (NVIDIA Wayland stability).
+- Window titlebar dots: KDE-decorated windows use Breeze controls. Apps that draw
+  their own titlebar (OpenCode, Chromium, Zen, Electron) ignore KDE decorations,
+  so their top-left icon and hover-only controls cannot be changed from here.
+- The desktop shortcut arrows are drawn by Plasma's Folder View; the icon files
+  are translucent but that overlay is not part of the icon theme.
+- RAR creation needs the proprietary `rar` package; extraction works with
+  `unrar`.
+- The 7z quick actions open a Ghostty window for the live log and close on
+  success; errors hold the window open.
 - If a Plasma update changes the task-manager QML API, the Sugar Dots applet may
   need a fix; `./install.sh --revert` returns to the stock taskbar.
 - Papirus-Dark's large sizes are shared with the `Papirus` base tree; the
