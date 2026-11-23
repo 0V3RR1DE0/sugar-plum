@@ -499,7 +499,12 @@ case "${1:-apply}" in
     apply_wallpaper
     apply_scripts
     ok "Sugar Plum applied"
-    warn "log out/in to activate the screenshot shortcuts; run ./install.sh --system for login + Limine"
+    warn "log out/in to activate the screenshot shortcuts"
+    if [ -e "$REPO/state/system-applied" ]; then
+      ok "login + Limine already applied (revert: sudo ./install.sh --system --revert)"
+    else
+      warn "run ./install.sh --system for login + Limine"
+    fi
     ;;
   update|--update)
     if git -C "$REPO" remote get-url origin >/dev/null 2>&1; then
