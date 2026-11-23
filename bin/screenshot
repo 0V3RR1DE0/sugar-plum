@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Sugar Plum screenshot flow: Spectacle capture -> satty annotate -> clipboard + file.
+set -uo pipefail
+
+mode="${1:-region}"
+dir="$HOME/Pictures/Screenshots"
+mkdir -p "$dir"
+file="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"
+
+case "$mode" in
+  region) spectacle -r -b -n -o "$file" >/dev/null 2>&1 ;;
+  full)   spectacle -f -b -n -o "$file" >/dev/null 2>&1 ;;
+  window) spectacle -a -b -n -o "$file" >/dev/null 2>&1 ;;
+  *) exit 1 ;;
+esac
+
+# Cancelled, or the capture failed.
+[ -s "$file" ] || exit 0
+
+satty_bin="$(command -v satty || true)"
+if [ -z "$satty_bin" ]; then
+  notify-send -a "Sugar Plum" -i "$file" "Screenshot saved" "$file" 2>/dev/null || true
+  exit 0
+fi
+
+"$satty_bin" \
+  --filename "$file" \
+  --output-filename "$file" \
+  --copy-command wl-copy \
+  --save-after-copy \
+  --actions-on-enter save-to-clipboard \
+  --early-exit copy \
+  >/dev/null 2>&1 || true
+
+notify-send -a "Sugar Plum" -i "$file" "Screenshot saved" "$file" 2>/dev/null || true

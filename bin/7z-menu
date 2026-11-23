@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Sugar Plum 7z actions, launched from Dolphin/KIO.
+set -uo pipefail
+
+log="/tmp/sugar-7z-$$.log"
+mode="${1:-}"
+shift || true
+
+have() { command -v "$1" >/dev/null 2>&1; }
+notify() { have notify-send && notify-send -a "Sugar Plum" "$@" || true; }
+ask_text() { zenity --entry --title="7z" --text="$1" --entry-text="$2" 2>/dev/null; }
+ask_yes() { zenity --question --title="7z" --text="$1" 2>/dev/null; }
+ask_pass() { zenity --password --title="7z password" 2>/dev/null; }
+
+fail() {
+  notify -u critical -i dialog-error "7z failed" "$1"
+  if have zenity && [ -s "$log" ]; then
+    zenity --text-info --title="7z failed" --filename="$log" --width=760 --height=420 2>/dev/null || true
+  fi
+  exit 1
+}
+
+have 7z || fail "The 7z binary is not installed."
+
+run_progress() {
+  local title="$1"; shift
+  if have zenity; then
+    "$@" 2>"$log" | zenity --progress --pulsate --auto-close --no-cancel --title="$title" 2>/dev/null
+    return "${PIPESTATUS[0]}"
+  fi
+  "$@" 2>"$log"
+}
+
+abs() {
+  local p="$1"
+  if [ -e "$p" ]; then readlink -f -- "$p"; else printf '%s\n' "$p"; fi
+}
+
+compress() {
+  local ext="$1" level="$2" want_pass="$3"; shift 3
+  local -a files=("$@")
+  [ "${#files[@]}" -gt 0 ] || exit 0
+
+  local first dir base default name out pass="" args=()
+  first="$(abs "${files[0]}")"
+  dir="$(dirname -- "$first")"
+  base="$(basename -- "$first")"
+  if [ "${#files[@]}" -eq 1 ] && [ ! -d "$first" ]; then
+    base="${base%.*}"
+  fi
+  [ -n "$base" ] || base="Archive"
+  default="$base.$ext"
+
+  name="$(ask_text "Archive name" "$default")" || exit 0
+  [ -n "$name" ] || exit 0
+  name="$(basename -- "$name")"
+  case "${name,,}" in
+    *."$ext") ;;
+    *) name="$name.$ext" ;;
+  esac
+  out="$dir/$name"
+
+  if [ -e "$out" ]; then
+    ask_yes "$name already exists. Replace it?" || exit 0
+    rm -f -- "$out" || fail "Could not replace $name."
+  fi
+
+  if [ "$want_pass" = "1" ]; then
+    pass="$(ask_pass)" || exit 0
+    [ -n "$pass" ] || exit 0
+    args+=(-p"$pass" -mhe=on)
+  fi
+
+  args+=(-t"$ext" -mx="$level" -mmt=on -y)
+  notify -i package-x-generic "Compressing" "$name"
+  if run_progress "Compressing $name" 7z a "${args[@]}" -- "$out" "${files[@]}"; then
+    notify -i package-x-generic "Compressed" "$out"
+  else
+    fail "Could not create $name."
+  fi
+}
+
+extract() {
+  local where="$1" want_pass="$2"; shift 2
+  local -a files=("$@")
+  [ "${#files[@]}" -gt 0 ] || exit 0
+
+  local pass=""
+  if [ "$want_pass" = "1" ]; then
+    pass="$(ask_pass)" || exit 0
+    [ -n "$pass" ] || exit 0
+  fi
+
+  local a dir base out count=0
+  for a in "${files[@]}"; do
+    [ -f "$a" ] || continue
+    a="$(abs "$a")"
+    dir="$(dirname -- "$a")"
+    base="$(basename -- "$a")"
+    case "$where" in
+      here) out="$dir" ;;
+      folder)
+        case "$base" in
+          *.tar.gz|*.tar.xz|*.tar.zst|*.tar.bz2) out="$dir/${base%.*.*}" ;;
+          *) out="$dir/${base%.*}" ;;
+        esac
+        ;;
+      ask)
+        out="$(zenity --file-selection --directory --title="Extract $base to…" 2>/dev/null)" || exit 0
+        [ -n "$out" ] || exit 0
+        ;;
+      *) exit 1 ;;
+    esac
+
+    mkdir -p -- "$out" || fail "Could not create $out."
+    local -a args=(-aos -y -o"$out")
+    [ -n "$pass" ] && args+=(-p"$pass")
+
+    if run_progress "Extracting $base" 7z x "${args[@]}" -- "$a"; then
+      count=$((count + 1))
+    else
+      fail "Could not extract $base."
+    fi
+  done
+
+  [ "$count" -gt 0 ] && notify -i package-x-generic "Extracted" "$count archive(s)"
+}
+
+case "$mode" in
+  compress7z)     compress 7z 5 0 "$@" ;;
+  compress7zmax)  compress 7z 9 0 "$@" ;;
+  compress7zpass) compress 7z 5 1 "$@" ;;
+  compresszip)    compress zip 5 0 "$@" ;;
+  extracthere)    extract here 0 "$@" ;;
+  extractto)      extract folder 0 "$@" ;;
+  extractask)     extract ask 0 "$@" ;;
+  extractpass)    extract ask 1 "$@" ;;
+  *) exit 1 ;;
+esac
+
+rm -f -- "$log"

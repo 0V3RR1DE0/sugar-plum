@@ -1,0 +1,28 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=application/x-7z-compressed;application/zip;application/x-rar;application/x-rar-compressed;application/vnd.rar;application/x-tar;application/x-compressed-tar;application/gzip;application/x-gzip;application/x-bzip2;application/x-xz;application/zstd;application/x-lz4;application/x-lzip;application/x-lzma;application/x-archive;
+Actions=extracthere;extractto;extractask;extractpass;
+X-KDE-Submenu=7z
+X-KDE-Priority=TopLevel
+Icon=application-x-7z-compressed
+
+[Desktop Action extracthere]
+Name=Extract here
+Icon=archive-extract
+Exec=@BIN@ extracthere %F
+
+[Desktop Action extractto]
+Name=Extract to folder
+Icon=archive-extract
+Exec=@BIN@ extractto %F
+
+[Desktop Action extractask]
+Name=Extract to…
+Icon=archive-extract
+Exec=@BIN@ extractask %F
+
+[Desktop Action extractpass]
+Name=Extract with password…
+Icon=archive-extract
+Exec=@BIN@ extractpass %F

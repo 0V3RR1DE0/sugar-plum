@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Sugar Plum
+Comment=Pastel overrides over Papirus-Dark
+Inherits=Papirus-Dark,hicolor
+Directories=scalable/apps
+
+[scalable/apps]
+Size=64
+Type=Scalable
+MinSize=16
+MaxSize=512
+Context=Applications

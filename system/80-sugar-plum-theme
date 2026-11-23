@@ -1,0 +1,33 @@
+#!/bin/sh
+# Re-apply the Sugar Plum Limine block after limine-entry-tool regenerates the
+# config. Runs before 90-limine-enroll-config, so an enrolled hash stays valid.
+set -eu
+
+ESP="${ESP_PATH:-}"
+if [ -z "$ESP" ]; then
+  ESP="$(sed -n 's/^ESP_PATH="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' /etc/default/limine 2>/dev/null | head -n1)"
+fi
+ESP="${ESP:-/boot}"
+CONF="$ESP/limine.conf"
+THEME="$ESP/sugar-plum/limine-theme.conf"
+
+[ -f "$CONF" ] || exit 0
+[ -f "$THEME" ] || exit 0
+
+python3 - "$CONF" "$THEME" <<'PY'
+import sys, pathlib
+conf = pathlib.Path(sys.argv[1])
+theme = pathlib.Path(sys.argv[2])
+text = conf.read_text()
+start, end = "# >>> sugar-plum >>>", "# <<< sugar-plum <<<"
+if start in text and end in text:
+    a = text.index(start)
+    b = text.index(end, a) + len(end)
+    text = (text[:a] + text[b:]).lstrip("\n")
+block = start + "\n" + theme.read_text().rstrip("\n") + "\n" + end + "\n"
+conf.write_text(block + "\n" + text.lstrip("\n"))
+PY
+
+if grep -q '^ENABLE_ENROLL_LIMINE_CONFIG=yes' /etc/default/limine 2>/dev/null; then
+  limine-enroll-config >/dev/null 2>&1 || true
+fi

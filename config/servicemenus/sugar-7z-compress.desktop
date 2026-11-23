@@ -1,0 +1,28 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=all/allfiles;inode/directory;
+Actions=sevenzip;sevenzipmax;sevenzippass;zip;
+X-KDE-Submenu=7z
+X-KDE-Priority=TopLevel
+Icon=application-x-7z-compressed
+
+[Desktop Action sevenzip]
+Name=Compress to .7z
+Icon=application-x-7z-compressed
+Exec=@BIN@ compress7z %F
+
+[Desktop Action sevenzipmax]
+Name=Compress to .7z (maximum)
+Icon=application-x-7z-compressed
+Exec=@BIN@ compress7zmax %F
+
+[Desktop Action sevenzippass]
+Name=Compress to .7z (password)…
+Icon=application-x-7z-compressed
+Exec=@BIN@ compress7zpass %F
+
+[Desktop Action zip]
+Name=Compress to .zip
+Icon=application-zip
+Exec=@BIN@ compresszip %F

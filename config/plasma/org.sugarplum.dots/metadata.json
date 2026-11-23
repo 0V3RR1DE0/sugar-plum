@@ -1,0 +1,19 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Authors": [
+      {
+        "Name": "chain"
+      }
+    ],
+    "Category": "Windows and Tasks",
+    "Description": "Three pastel dots per open window",
+    "EnabledByDefault": true,
+    "Icon": "preferences-system-windows",
+    "Id": "org.sugarplum.dots",
+    "License": "MIT",
+    "Name": "Sugar Dots",
+    "Version": "1.0"
+  },
+  "X-Plasma-API-Minimum-Version": "6.0"
+}

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Sugar Screenshot (Region)
+Exec=@BIN@ region
+Icon=camera-photo
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-Shortcuts=Print

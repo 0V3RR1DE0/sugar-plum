@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sugar Plum — a soft-dark desktop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --plum:#1e1e2e;
+    --midnight:#181825;
+    --ink:#11111b;
+    --void:#0e0b14;
+    --surface:#313244;
+    --surface2:#45475a;
+    --milk:#ede6f5;
+    --smoke:#a6adc8;
+    --dim:#7c7190;
+    --candy:#ffb3d9;
+    --lilac:#c8b6e2;
+    --peri:#aec6ff;
+    --orchid:#e6c3ff;
+    --seafoam:#b8e6e6;
+    --mint:#b8e6c8;
+    --butter:#f7e1b5;
+    --line:rgba(237,230,245,.12);
+    --line-soft:rgba(237,230,245,.07);
+    --glass:rgba(24,24,37,.58);
+    --ui:"Nunito",system-ui,sans-serif;
+    --mono:"Fira Code",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--void);
+    color:var(--milk);
+    font-family:var(--ui);
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--candy);color:var(--plum)}
+  a{color:var(--peri);text-decoration:none}
+  a:hover{text-decoration:underline;text-underline-offset:3px}
+  button{font-family:inherit}
+
+  .aurora{
+    position:fixed;inset:0;z-index:-2;overflow:hidden;
+    background:
+      radial-gradient(48% 42% at 14% 8%,rgba(255,179,217,.16),transparent 65%),
+      radial-gradient(46% 40% at 86% 4%,rgba(174,198,255,.14),transparent 62%),
+      radial-gradient(52% 46% at 70% 62%,rgba(200,182,226,.12),transparent 65%),
+      var(--void);
+  }
+  .aurora i{
+    position:absolute;border-radius:50%;filter:blur(70px);opacity:.4;
+    animation:drift 26s ease-in-out infinite alternate;
+  }
+  .aurora i:nth-child(1){width:520px;height:520px;left:-120px;top:-80px;background:var(--candy)}
+  .aurora i:nth-child(2){width:460px;height:460px;right:-60px;top:12%;background:var(--peri);animation-delay:-9s}
+  .aurora i:nth-child(3){width:560px;height:560px;left:48%;top:46%;background:var(--lilac);animation-delay:-16s}
+  @keyframes drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(40px,30px,0) scale(1.08)}}
+  .grain{
+    position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+  }
+
+  .wrap{width:min(1180px,calc(100% - 48px));margin:0 auto}
+
+  header.top{
+    position:sticky;top:0;z-index:20;
+    backdrop-filter:blur(18px) saturate(120%);
+    background:rgba(14,11,20,.72);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .top .wrap{display:flex;align-items:center;gap:24px;height:64px}
+  .wordmark{font-weight:900;letter-spacing:-.03em;font-size:19px;display:flex;align-items:center;gap:8px;color:var(--milk)}
+  .wordmark .star{color:var(--candy);font-size:14px;transform:translateY(-1px)}
+  .top nav{display:flex;gap:22px;margin-left:auto;font-size:14px;font-weight:700}
+  .top nav a{color:var(--smoke)}
+  .top nav a:hover{color:var(--milk);text-decoration:none}
+  .top .pill{
+    font-family:var(--mono);font-size:11px;color:var(--mint);
+    border:1px solid rgba(184,230,200,.28);background:rgba(184,230,200,.07);
+    padding:5px 10px;border-radius:999px;white-space:nowrap;
+  }
+
+  .hero{padding:92px 0 56px;display:grid;grid-template-columns:1.08fr .92fr;gap:56px;align-items:center}
+  .hero .meta{font-family:var(--mono);font-size:12px;letter-spacing:.02em;color:var(--dim);margin:0 0 22px}
+  .hero .meta b{color:var(--lilac);font-weight:500}
+  h1{
+    font-size:clamp(3.4rem,7.2vw,6.1rem);
+    line-height:.92;letter-spacing:-.045em;font-weight:900;
+    margin:0 0 26px;text-wrap:balance;
+  }
+  h1 .soft{
+    display:inline-block;
+    background:linear-gradient(100deg,var(--candy) 0%,var(--orchid) 34%,var(--peri) 72%,var(--seafoam) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lede{font-size:18px;line-height:1.65;color:var(--smoke);max-width:46ch;margin:0 0 30px}
+  .lede strong{color:var(--milk);font-weight:800}
+  .actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .cmd{
+    font-family:var(--mono);font-size:13px;background:rgba(24,24,37,.8);
+    border:1px solid var(--line);border-radius:10px;padding:11px 15px;color:var(--seafoam);
+  }
+  .cmd .p{color:var(--candy)}
+  .ghost{
+    font-weight:800;font-size:14px;color:var(--lilac);
+    border:1px solid rgba(200,182,226,.3);border-radius:10px;padding:11px 16px;
+    background:rgba(200,182,226,.06);cursor:pointer;
+  }
+  .ghost:hover{background:rgba(200,182,226,.12)}
+  .hero-note{margin:18px 0 0;font-size:13px;color:var(--dim)}
+
+  /* hero terminal */
+  .term{
+    background:rgba(17,17,27,.92);
+    border:1px solid rgba(237,230,245,.13);
+    border-radius:16px;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.9),0 0 0 1px rgba(255,179,217,.05) inset;
+    overflow:hidden;
+    position:relative;
+  }
+  .term::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(120% 80% at 100% 0%,rgba(230,195,255,.12),transparent 55%);
+  }
+  .term .bar{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .dot.a{background:var(--candy)}.dot.b{background:var(--butter)}.dot.c{background:var(--mint)}
+  .term .bar span.t{margin-left:8px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .term .bar .live{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--mint);display:flex;align-items:center;gap:6px}
+  .term .bar .live i{width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px var(--mint)}
+  .term pre{margin:0;padding:18px 18px 22px;font-family:var(--mono);font-size:12.5px;line-height:1.85;white-space:pre-wrap}
+  .c-candy{color:var(--candy)}.c-lilac{color:var(--lilac)}.c-peri{color:var(--peri)}
+  .c-orchid{color:var(--orchid)}.c-sea{color:var(--seafoam)}.c-mint{color:var(--mint)}
+  .c-butter{color:var(--butter)}.c-smoke{color:var(--smoke)}.c-dim{color:var(--dim)}.c-milk{color:var(--milk)}
+  .term-caption{display:flex;gap:9px;align-items:center;font-family:var(--mono);font-size:11px;color:var(--smoke);margin-top:14px;background:rgba(24,24,37,.55);border:1px solid var(--line-soft);border-radius:8px;padding:7px 10px;width:max-content;max-width:100%}
+  .term-caption .sw{display:flex;gap:3px}
+  .term-caption .sw i{width:10px;height:10px;border-radius:3px;display:block}
+
+  section{padding:74px 0 0}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:32px;border-top:1px solid var(--line-soft);padding-top:26px;margin-bottom:34px}
+  h2{font-size:clamp(1.7rem,3vw,2.4rem);line-height:1.05;letter-spacing:-.03em;font-weight:900;margin:0}
+  .sub{margin:0;color:var(--smoke);max-width:52ch;font-size:15px}
+  .sub b{color:var(--milk)}
+
+  /* palette */
+  .swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .swatch{
+    border:0;padding:0;background:none;text-align:left;cursor:pointer;color:inherit;
+    border-radius:14px;outline-offset:4px;
+  }
+  .swatch .chip{
+    height:132px;border-radius:14px;position:relative;overflow:hidden;
+    display:flex;align-items:flex-end;padding:13px;
+    transition:transform .25s ease,box-shadow .25s ease;
+  }
+  .swatch:hover .chip{transform:translateY(-3px);box-shadow:0 18px 40px -18px rgba(0,0,0,.8)}
+  .swatch .chip b{font-weight:900;font-size:17px;color:var(--plum);letter-spacing:-.01em}
+  .swatch .chip em{position:absolute;top:12px;right:13px;font-style:normal;font-family:var(--mono);font-size:10.5px;color:rgba(17,17,27,.72)}
+  .swatch .role{margin-top:9px;font-size:13px;color:var(--smoke);display:flex;gap:8px;align-items:baseline}
+  .swatch .role code{display:none}
+  .swatch.tall .chip{height:132px}
+  .swatch.ink .chip{background:var(--ink);border:1px solid var(--line)}
+  .swatch.ink .chip b,.swatch.plum .chip b{color:var(--milk)}
+  .swatch.ink .chip em,.swatch.plum .chip em{color:rgba(237,230,245,.6)}
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);
+    background:var(--milk);color:var(--plum);font-weight:800;font-size:13px;
+    padding:9px 16px;border-radius:999px;opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;z-index:50;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* desktop mock */
+  .bezel{
+    border-radius:26px;padding:12px;
+    background:linear-gradient(160deg,rgba(200,182,226,.16),rgba(24,24,37,.6) 40%,rgba(255,179,217,.12));
+    border:1px solid rgba(237,230,245,.12);
+    box-shadow:0 40px 100px -40px rgba(0,0,0,.95);
+  }
+  .screen{
+    position:relative;aspect-ratio:16/9;border-radius:17px;overflow:hidden;
+    container-type:inline-size;
+    background:#14101c;
+  }
+  .wall{
+    position:absolute;inset:0;
+    background:
+      radial-gradient(58% 74% at 18% 26%,rgba(255,179,217,.52),transparent 64%),
+      radial-gradient(48% 62% at 82% 18%,rgba(174,198,255,.46),transparent 66%),
+      radial-gradient(72% 76% at 64% 96%,rgba(200,182,226,.5),transparent 68%),
+      radial-gradient(40% 46% at 44% 58%,rgba(230,195,255,.28),transparent 72%),
+      linear-gradient(158deg,#2d1e3a 0%,#1a1322 52%,#21172c 100%);
+  }
+  .wall::after{
+    content:"";position:absolute;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
+    opacity:.7;
+  }
+  .deco-star{position:absolute;color:rgba(255,255,255,.5);font-size:1.4cqw;text-shadow:0 0 12px currentColor}
+  .deco-star.s1{left:9%;top:14%;color:var(--candy)}
+  .deco-star.s2{right:12%;top:22%;color:var(--peri);font-size:1cqw}
+  .deco-star.s3{left:38%;top:9%;color:var(--orchid);font-size:.9cqw}
+  .deco-star.s4{right:27%;bottom:33%;color:var(--seafoam);font-size:.8cqw}
+
+  .panel{
+    position:absolute;left:50%;bottom:2.2cqw;transform:translateX(-50%);
+    width:74%;height:5.4cqw;border-radius:1.9cqw;
+    background:rgba(24,24,37,.52);
+    border:1px solid rgba(237,230,245,.14);
+    backdrop-filter:blur(22px) saturate(130%);
+    box-shadow:0 14px 40px -10px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.06);
+    display:flex;align-items:center;gap:.75cqw;padding:0 1.1cqw;
+  }
+  .launcher{
+    width:3.4cqw;height:3.4cqw;border-radius:1.1cqw;display:grid;place-items:center;
+    background:linear-gradient(140deg,rgba(255,179,217,.32),rgba(174,198,255,.26));
+    border:1px solid rgba(255,255,255,.16);
+  }
+  .launcher svg{width:1.7cqw;height:1.7cqw;color:var(--milk)}
+  .psep{width:1px;height:2.4cqw;background:rgba(237,230,245,.14);margin:0 .3cqw}
+  .app{
+    width:3.2cqw;height:3.2cqw;border-radius:1cqw;display:grid;place-items:center;position:relative;
+    background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.07);
+  }
+  .app svg{width:1.65cqw;height:1.65cqw}
+  .app.active{background:rgba(255,179,217,.14);border-color:rgba(255,179,217,.36)}
+  .app.active::after{content:"";position:absolute;bottom:-.65cqw;width:.42cqw;height:.42cqw;border-radius:50%;background:var(--candy);box-shadow:0 0 6px var(--candy)}
+  .app.f1 svg{color:var(--peri)}
+  .app.f2 svg{color:var(--mint)}
+  .app.f3 svg{color:var(--candy)}
+  .app.f4 svg{color:var(--butter)}
+  .clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;padding-right:.25cqw}
+  .clock b{font-size:1.25cqw;font-weight:800;color:var(--milk)}
+  .clock span{font-size:.82cqw;color:var(--smoke)}
+  .tray{display:flex;align-items:center;gap:.9cqw;padding-left:.9cqw;border-left:1px solid rgba(237,230,245,.12);height:2.6cqw}
+  .tray svg{width:1.3cqw;height:1.3cqw;color:var(--smoke)}
+  .tray .bat{color:var(--mint)}
+
+  .win{
+    position:absolute;border-radius:1.1cqw;overflow:hidden;
+    background:rgba(24,24,37,.9);
+    border:1px solid rgba(237,230,245,.13);
+    box-shadow:0 24px 60px -18px rgba(0,0,0,.8);
+    backdrop-filter:blur(18px);
+  }
+  .winbar{height:2.5cqw;display:flex;align-items:center;gap:.5cqw;padding:0 .95cqw;background:rgba(49,50,68,.55);border-bottom:1px solid rgba(237,230,245,.08)}
+  .winbar .dot{width:.62cqw;height:.62cqw}
+  .winbar .tt{margin-left:.7cqw;font-size:.85cqw;color:var(--smoke);font-weight:700}
+  .winbar .ic{margin-left:auto;width:.8cqw;height:.8cqw;border-radius:.2cqw;background:rgba(255,255,255,.12)}
+
+  .dolphin{left:7%;top:11%;width:46%;height:50%}
+  .dolphin .body{display:flex;height:calc(100% - 2.5cqw)}
+  .side{width:31%;padding:.9cqw .7cqw;background:rgba(17,17,27,.5);border-right:1px solid rgba(237,230,245,.07)}
+  .side .shead{font-size:.63cqw;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;margin:.2cqw .4cqw .55cqw}
+  .srow{display:flex;align-items:center;gap:.45cqw;padding:.38cqw .5cqw;border-radius:.45cqw;font-size:.82cqw;color:var(--smoke)}
+  .srow i{width:.4cqw;height:.4cqw;border-radius:50%;background:var(--dim);flex:none}
+  .srow.on{background:rgba(200,182,226,.15);color:var(--milk)}
+  .srow.on i{background:var(--lilac)}
+  .main{padding:.9cqw 1cqw;flex:1;min-width:0}
+  .crumb{display:flex;gap:.4cqw;font-size:.68cqw;color:var(--dim);margin-bottom:.75cqw;font-family:var(--mono)}
+  .crumb b{color:var(--milk);font-weight:600}
+  .files{display:grid;grid-template-columns:repeat(4,1fr);gap:.6cqw}
+  .file{text-align:center}
+  .fold{
+    height:3.5cqw;border-radius:.55cqw;display:grid;place-items:center;
+    background:linear-gradient(150deg,rgba(255,179,217,.28),rgba(230,195,255,.12));
+    border:1px solid rgba(255,179,217,.22);
+  }
+  .fold svg{width:1.75cqw;height:1.75cqw;color:var(--candy)}
+  .file.mint .fold{background:linear-gradient(150deg,rgba(184,230,200,.22),rgba(184,230,230,.1));border-color:rgba(184,230,200,.22)}
+  .file.mint .fold svg{color:var(--mint)}
+  .file.peri .fold{background:linear-gradient(150deg,rgba(174,198,255,.22),rgba(200,182,226,.1));border-color:rgba(174,198,255,.22)}
+  .file.peri .fold svg{color:var(--peri)}
+  .file .fname{font-size:.68cqw;color:var(--smoke);margin-top:.4cqw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .ghost-term{right:6%;bottom:22%;width:45%;height:34%}
+  .ghost-term .in{padding:1cqw 1.1cqw;font-family:var(--mono);font-size:.82cqw;line-height:1.95}
+  .ghost-term .p1{color:var(--smoke)} .ghost-term .p2{color:var(--candy)}
+  .ghost-term .p3{color:var(--lilac)} .ghost-term .p4{color:var(--peri)}
+
+  .shot{
+    position:absolute;right:7%;top:10%;width:26%;border-radius:.8cqw;overflow:hidden;
+    border:1px solid rgba(237,230,245,.14);box-shadow:0 18px 40px -16px rgba(0,0,0,.8);
+    background:rgba(24,24,37,.9);
+  }
+  .shot img{display:block;width:100%}
+  .shot .cap{font-size:.6cqw;color:var(--smoke);padding:.45cqw .6cqw;display:flex;justify-content:space-between}
+  .shot .cap b{color:var(--mint)}
+  .shot-moon{position:absolute;right:17%;top:20%;width:36%;aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff7e6,var(--butter) 40%,var(--orchid));
+    box-shadow:0 0 2.4cqw rgba(255,179,217,.45);opacity:.92}
+  .shot-star{position:absolute;left:13%;top:18%;color:var(--peri);font-size:1.1cqw;text-shadow:0 0 1cqw currentColor}
+
+  /* screen tabs */
+  .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .tab{
+    font-weight:800;font-size:13px;color:var(--smoke);background:rgba(255,255,255,.04);
+    border:1px solid var(--line-soft);padding:8px 14px;border-radius:999px;cursor:pointer;
+  }
+  .tab:hover{color:var(--milk)}
+  .tab[aria-selected="true"]{background:linear-gradient(100deg,rgba(255,179,217,.2),rgba(200,182,226,.22));border-color:rgba(255,179,217,.55);color:var(--milk);box-shadow:0 0 20px -6px rgba(255,179,217,.35)}
+  .pane[hidden]{display:none}
+  .pane-stage{
+    position:relative;aspect-ratio:16/9;border-radius:20px;overflow:hidden;
+    border:1px solid var(--line);container-type:inline-size;
+    box-shadow:0 40px 90px -45px rgba(0,0,0,.9);
+  }
+
+  /* login */
+  .login{position:absolute;inset:0}
+  .login .veil{position:absolute;inset:0;background:rgba(14,11,20,.24);backdrop-filter:blur(2px)}
+  .brand-mini{
+    position:absolute;left:2.6cqw;top:2.2cqw;z-index:2;font-weight:900;font-size:1.15cqw;
+    letter-spacing:-.02em;color:var(--milk);display:flex;align-items:center;gap:.4cqw;
+  }
+  .brand-mini i{font-style:normal;color:var(--candy);font-size:.9cqw}
+  .login .bigclock{position:absolute;right:2.8cqw;top:2.1cqw;z-index:2;text-align:right;line-height:1.15}
+  .login .bigclock b{display:block;font-size:2.1cqw;font-weight:300;letter-spacing:-.02em;color:var(--milk)}
+  .login .bigclock span{font-size:.75cqw;color:var(--smoke)}
+  .login-card{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;
+    width:24cqw;padding:2.2cqw 2.4cqw 1.9cqw;border-radius:1.5cqw;
+    background:rgba(24,24,37,.62);border:1px solid rgba(237,230,245,.16);
+    backdrop-filter:blur(26px) saturate(130%);
+    box-shadow:0 30px 70px -20px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.07);
+    text-align:center;
+  }
+  .avatar{
+    width:4.6cqw;height:4.6cqw;border-radius:50%;margin:0 auto 1.1cqw;
+    background:conic-gradient(from 210deg,var(--candy),var(--orchid),var(--peri),var(--seafoam),var(--candy));
+    padding:.16cqw;
+  }
+  .avatar span{
+    display:grid;place-items:center;width:100%;height:100%;border-radius:50%;
+    background:var(--midnight);color:var(--candy);font-size:1.7cqw;
+  }
+  .login-card h3{margin:0 0 .3cqw;font-size:1.3cqw;font-weight:900;letter-spacing:-.02em}
+  .login-card p{margin:0 0 1.4cqw;font-size:.7cqw;color:var(--smoke)}
+  .field{
+    height:2.3cqw;border-radius:.6cqw;background:rgba(17,17,27,.7);
+    border:1px solid rgba(200,182,226,.35);display:flex;align-items:center;gap:.25cqw;
+    padding:0 .8cqw;margin-bottom:.9cqw;justify-content:center;
+  }
+  .field i{width:.38cqw;height:.38cqw;border-radius:50%;background:var(--milk);opacity:.85}
+  .login-btn{
+    height:2.25cqw;width:100%;border:0;border-radius:.6cqw;cursor:default;
+    background:linear-gradient(100deg,var(--candy),var(--lilac) 60%,var(--peri));
+    color:#241a2e;font-weight:900;font-size:.82cqw;letter-spacing:.01em;
+  }
+  .session{margin-top:1.1cqw;font-size:.68cqw;color:var(--smoke);display:flex;align-items:center;justify-content:center;gap:.35cqw}
+  .session svg{width:.7cqw;height:.7cqw}
+  .login-foot{position:absolute;left:0;right:0;bottom:1.5cqw;z-index:2;text-align:center;font-size:.65cqw;color:rgba(237,230,245,.5)}
+
+  /* boot */
+  .boot{position:absolute;inset:0}
+  .boot .veil{position:absolute;inset:0;background:linear-gradient(90deg,rgba(14,11,20,.78),rgba(14,11,20,.3))}
+  .boot .moon{
+    position:absolute;right:9cqw;top:34%;width:13cqw;height:13cqw;border-radius:50%;z-index:1;
+    background:radial-gradient(circle at 36% 32%,#fff7e6 0%,var(--butter) 38%,var(--orchid) 78%,rgba(230,195,255,.2) 100%);
+    box-shadow:0 0 5cqw rgba(255,179,217,.32),0 0 12cqw rgba(174,198,255,.16);opacity:.92;
+  }
+  .boot .moon::after{content:"";position:absolute;inset:-2.4cqw;border-radius:50%;border:1px solid rgba(237,230,245,.12)}
+  .boot .bstar{position:absolute;z-index:1;color:var(--candy);text-shadow:0 0 1.2cqw currentColor;opacity:.85}
+  .boot .bstar.b1{right:24cqw;top:18%;font-size:1.2cqw}
+  .boot .bstar.b2{right:7cqw;bottom:26%;font-size:.9cqw;color:var(--peri)}
+  .boot .bstar.b3{right:30cqw;bottom:16%;font-size:.7cqw;color:var(--seafoam)}
+  .boot-brand{position:absolute;left:4cqw;top:3.2cqw;font-weight:900;font-size:1.7cqw;letter-spacing:-.02em;z-index:2}
+  .boot-brand i{font-style:normal;color:var(--candy)}
+  .boot-brand small{display:block;font-family:var(--mono);font-size:.68cqw;font-weight:400;color:var(--dim);letter-spacing:.14em;margin-top:.3cqw}
+  .boot-menu{
+    position:absolute;left:4cqw;top:8.6cqw;z-index:2;width:54%;font-family:var(--mono);
+  }
+  .boot-row{
+    display:flex;align-items:center;gap:.8cqw;padding:.52cqw .8cqw;border-radius:.45cqw;
+    font-size:.9cqw;color:var(--smoke);border-left:2px solid transparent;
+  }
+  .boot-row .n{color:var(--dim);width:1.4cqw}
+  .boot-row .k{margin-left:auto;font-size:.58cqw;color:var(--dim)}
+  .boot-row.on{
+    background:linear-gradient(90deg,rgba(200,182,226,.2),rgba(255,179,217,.04));
+    border-left-color:var(--candy);color:var(--milk);
+  }
+  .boot-row.on .n{color:var(--candy)}
+  .boot-row.on .k{color:var(--lilac)}
+  .boot-foot{
+    position:absolute;left:4cqw;bottom:2.4cqw;z-index:2;font-family:var(--mono);font-size:.68cqw;color:var(--dim);
+    display:flex;gap:1.4cqw;
+  }
+  .boot-foot b{color:var(--smoke);font-weight:500}
+  .boot-count{position:absolute;right:4cqw;bottom:2.4cqw;z-index:2;font-family:var(--mono);font-size:.62cqw;color:var(--lilac)}
+
+  /* shells */
+  .shells{position:absolute;inset:0;background:var(--ink);padding:2cqw;display:grid;grid-template-columns:1.05fr .95fr;grid-template-rows:1fr auto;gap:1.4cqw;container-type:inline-size}
+  .pane-box{background:rgba(24,24,37,.85);border:1px solid var(--line-soft);border-radius:1cqw;overflow:hidden;display:flex;flex-direction:column}
+  .pane-box .winbar{height:2.2cqw;flex:none}
+  .pane-box pre{margin:0;padding:1.3cqw 1.4cqw;font-family:var(--mono);font-size:.9cqw;line-height:1.95;white-space:pre-wrap;flex:1}
+  .shells .btop{
+    grid-column:1/-1;background:rgba(24,24,37,.85);border:1px solid var(--line-soft);border-radius:1cqw;
+    padding:1.1cqw 1.3cqw;font-family:var(--mono);font-size:.84cqw;display:grid;grid-template-columns:1fr 1fr;gap:1.6cqw;
+  }
+  .meter{display:grid;grid-template-columns:auto 1fr auto;gap:.6cqw;align-items:center;margin-bottom:.5cqw}
+  .meter span{color:var(--smoke)}
+  .meter .bar{height:.42cqw;border-radius:.2cqw;background:rgba(255,255,255,.08);overflow:hidden}
+  .meter .bar i{display:block;height:100%;border-radius:.2cqw}
+  .meter b{color:var(--milk);font-weight:500}
+  .cpu .bar i{width:34%;background:linear-gradient(90deg,var(--mint),var(--seafoam))}
+  .mem .bar i{width:58%;background:linear-gradient(90deg,var(--lilac),var(--peri))}
+  .dsk .bar i{width:43%;background:linear-gradient(90deg,var(--butter),var(--candy))}
+  .tmp .bar i{width:61%;background:linear-gradient(90deg,var(--orchid),var(--candy))}
+
+  /* everywhere */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 56px}
+  .row{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:15px 0;border-bottom:1px solid var(--line-soft);align-items:start}
+  .row .dotmark{width:9px;height:9px;border-radius:50%;margin-top:9px;box-shadow:0 0 10px currentColor}
+  .row h3{margin:0 0 3px;font-size:15px;font-weight:800;letter-spacing:-.01em}
+  .row p{margin:0;font-size:13.5px;color:var(--smoke);line-height:1.55}
+  .row code{font-family:var(--mono);font-size:11.5px;color:var(--lilac)}
+
+  /* revert */
+  .revert{
+    margin-top:74px;border-top:1px solid var(--line-soft);padding:46px 0 30px;
+    display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start;
+  }
+  .revert h2{margin-bottom:14px}
+  .revert p{color:var(--smoke);font-size:15px;margin:0 0 16px;max-width:52ch}
+  .steps{list-style:none;padding:0;margin:26px 0 0;counter-reset:s}
+  .steps li{
+    counter-increment:s;position:relative;padding:0 0 16px 34px;color:var(--smoke);font-size:14px;
+  }
+  .steps li::before{
+    content:counter(s);position:absolute;left:0;top:-1px;width:22px;height:22px;border-radius:8px;
+    display:grid;place-items:center;font-size:11px;font-weight:900;color:var(--plum);
+    background:linear-gradient(140deg,var(--candy),var(--lilac));
+  }
+  .steps b{color:var(--milk)}
+  .ledger{
+    background:rgba(17,17,27,.8);border:1px solid var(--line);border-radius:14px;padding:18px 20px;
+  }
+  .ledger .lh{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--dim);border-bottom:1px solid var(--line-soft);padding-bottom:10px;margin-bottom:10px}
+  .ledger .lh b{color:var(--mint);font-weight:500}
+  .ledger pre{margin:0;font-family:var(--mono);font-size:11.5px;line-height:1.95;color:var(--smoke);white-space:pre-wrap}
+  .ledger .ok{color:var(--mint)} .ledger .warn{color:var(--butter)} .ledger .cmd{color:var(--peri)}
+
+  footer{position:relative;z-index:2;border-top:1px solid var(--line-soft);margin-top:64px;padding:26px 0 40px}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--dim)}
+  footer .fmono{font-family:var(--mono);font-size:11px}
+  footer .heart{color:var(--candy)}
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;gap:36px;padding-top:56px}
+    .swatches{grid-template-columns:repeat(2,1fr)}
+    .grid2,.revert{grid-template-columns:1fr;gap:24px}
+    .sec-head{flex-direction:column;align-items:flex-start;gap:12px}
+    .top nav{display:none}
+  }
+  @media (max-width:560px){
+    .swatches{grid-template-columns:1fr 1fr}
+    .wrap{width:calc(100% - 28px)}
+    .top .pill{display:none}
+    h1{font-size:3.1rem}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .aurora i{animation:none}
+    .swatch .chip{transition:none}
+  }
+  :focus-visible{outline:2px solid var(--candy);outline-offset:3px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="wordmark"><span class="star">✦</span> sugar plum</div>
+    <nav aria-label="Sections">
+      <a href="#colors">colors</a>
+      <a href="#desktop">desktop</a>
+      <a href="#screens">screens</a>
+      <a href="#everywhere">everywhere</a>
+    </nav>
+    <span class="pill">revertible</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero" style="padding-top:92px" aria-labelledby="hero-title">
+    <div>
+      <p class="meta"><b>Plasma 6.8</b> / Wayland / CachyOS — built from your own prompt</p>
+      <h1 id="hero-title">Pastel goth, <span class="soft">softly.</span></h1>
+      <p class="lede">A dark desktop built from the colors already in your Nu prompt — <strong>lilac, candy, periwinkle, orchid</strong> — sitting on Catppuccin Mocha. Rounded Nunito, floating glass, and a boot screen that matches.</p>
+      <div class="actions">
+        <span class="cmd"><span class="p">❯</span> ./install.sh</span>
+        <button class="ghost" id="revertBtn" type="button">or undo it all</button>
+      </div>
+      <p class="hero-note">Nothing is overwritten without a backup. No new background services.</p>
+    </div>
+
+    <div>
+      <div class="term" aria-label="Ghostty terminal preview">
+        <div class="bar"><span class="dot a"></span><span class="dot b"></span><span class="dot c"></span><span class="t">ghostty — nu</span><span class="live"><i></i>live</span></div>
+<pre><span class="c-orchid">✨</span> <span class="c-lilac">Nu Shell</span> <span class="c-dim">v0.115.1</span> <span class="c-sea">[18:42]</span> <span class="c-dim">—</span> <span class="c-candy">pastel goth</span> <span class="c-dim">mode</span>
+<span class="c-dim">──────────────────────────────────────────</span>
+<span class="c-mint">~/rice</span> <span class="c-dim">·</span> <span class="c-lilac">main</span>          <span class="c-dim">18:42</span>
+<span class="c-candy">λ</span> <span class="c-milk">eza --icons</span>
+<span class="c-peri">▸ bin/</span>     <span class="c-peri">▸ preview/</span>   <span class="c-peri">▸ themes/</span>
+<span class="c-peri">▸ wallpapers/</span>   <span class="c-smoke">README.md</span>   <span class="c-mint">install.sh</span>
+<span class="c-candy">λ</span> <span class="c-milk">btop</span> <span class="c-dim">--preset</span> <span class="c-sea">sugar-plum</span>
+<span class="c-mint">cpu</span> <span class="c-dim">▁▂▃▂▁▁▂▄▆▃▂▁</span> <span class="c-lilac">12%</span>   <span class="c-candy">mem</span> <span class="c-dim">▁▂▂▃▃▄▄▅▄▃</span> <span class="c-lilac">31%</span>
+<span class="c-candy">λ</span> <span class="c-dim">▌</span></pre>
+      </div>
+      <div class="term-caption">
+        <span class="sw"><i style="background:var(--candy)"></i><i style="background:var(--lilac)"></i><i style="background:var(--peri)"></i><i style="background:var(--orchid)"></i><i style="background:var(--seafoam)"></i></span>
+        the same five pastels, everywhere
+      </div>
+    </div>
+  </section>
+
+  <section id="colors" aria-labelledby="colors-title">
+    <div class="sec-head">
+      <h2 id="colors-title">The colors</h2>
+      <p class="sub">No neon. Every pastel is muted enough to sit on a dark screen for hours, and each one has a job. <b>Click any swatch to copy it.</b></p>
+    </div>
+    <div class="swatches">
+      <button class="swatch" data-hex="#FFB3D9" type="button">
+        <span class="chip" style="background:var(--candy)"><b>Candy</b><em>#FFB3D9</em></span>
+        <span class="role"><span>selection · git · cursor</span><code>pink</code></span>
+      </button>
+      <button class="swatch" data-hex="#C8B6E2" type="button">
+        <span class="chip" style="background:var(--lilac)"><b>Lilac</b><em>#C8B6E2</em></span>
+        <span class="role"><span>paths · active nav</span><code>primary</code></span>
+      </button>
+      <button class="swatch" data-hex="#AEC6FF" type="button">
+        <span class="chip" style="background:var(--peri)"><b>Periwinkle</b><em>#AEC6FF</em></span>
+        <span class="role"><span>time · links · folds</span><code>blue</code></span>
+      </button>
+      <button class="swatch" data-hex="#E6C3FF" type="button">
+        <span class="chip" style="background:var(--orchid)"><b>Orchid</b><em>#E6C3FF</em></span>
+        <span class="role"><span>prompt symbol · headings</span><code>purple</code></span>
+      </button>
+      <button class="swatch" data-hex="#B8E6E6" type="button">
+        <span class="chip" style="background:var(--seafoam)"><b>Seafoam</b><em>#B8E6E6</em></span>
+        <span class="role"><span>numbers · values · clock</span><code>cyan</code></span>
+      </button>
+      <button class="swatch" data-hex="#B8E6C8" type="button">
+        <span class="chip" style="background:var(--mint)"><b>Mint</b><em>#B8E6C8</em></span>
+        <span class="role"><span>success · cpu graphs</span><code>green</code></span>
+      </button>
+      <button class="swatch" data-hex="#F7E1B5" type="button">
+        <span class="chip" style="background:var(--butter)"><b>Butter</b><em>#F7E1B5</em></span>
+        <span class="role"><span>warnings · highlights</span><code>yellow</code></span>
+      </button>
+      <button class="swatch ink" data-hex="#1E1E2E" type="button">
+        <span class="chip" style="background:var(--plum)"><b>Plum</b><em>#1E1E2E</em></span>
+        <span class="role"><span>base · windows · terminal</span><code>mocha</code></span>
+      </button>
+    </div>
+  </section>
+
+  <section id="desktop" aria-labelledby="desktop-title">
+    <div class="sec-head">
+      <h2 id="desktop-title">One desktop</h2>
+      <p class="sub">Floating translucent panel, rounded Nunito, Papirus folders dipped in candy. The wallpaper rotates every 30 minutes from the same palette.</p>
+    </div>
+
+    <div class="bezel">
+      <div class="screen" role="img" aria-label="Preview of the Plasma desktop with a file manager, terminal, and floating panel">
+        <div class="wall"></div>
+        <span class="deco-star s1">✦</span>
+        <span class="deco-star s2">✧</span>
+        <span class="deco-star s3">✦</span>
+        <span class="deco-star s4">✧</span>
+
+        <div class="win dolphin">
+          <div class="winbar"><span class="dot a"></span><span class="dot b"></span><span class="dot c"></span><span class="tt">Dolphin — Pictures</span><span class="ic"></span></div>
+          <div class="body">
+            <div class="side">
+              <div class="shead">Places</div>
+              <div class="srow"><i></i>Home</div>
+              <div class="srow"><i></i>Documents</div>
+              <div class="srow on"><i></i>Pictures</div>
+              <div class="srow"><i></i>Music</div>
+              <div class="srow"><i></i>Downloads</div>
+              <div class="shead" style="margin-top:.8cqw">Tags</div>
+              <div class="srow" style="color:var(--candy)"><i style="background:var(--candy)"></i>soft</div>
+              <div class="srow" style="color:var(--peri)"><i style="background:var(--peri)"></i>work</div>
+            </div>
+            <div class="main">
+              <div class="crumb"><span>Pictures</span><span>/</span><b>Wallpapers</b></div>
+              <div class="files">
+                <div class="file"><div class="fold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div><div class="fname">SugarPlum</div></div>
+                <div class="file mint"><div class="fold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div><div class="fname">Clouds</div></div>
+                <div class="file peri"><div class="fold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div><div class="fname">Screenshots</div></div>
+                <div class="file"><div class="fold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div><div class="fname">Archive</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="shot" aria-hidden="true">
+          <div class="wall" style="position:relative;aspect-ratio:16/10">
+            <div class="shot-moon"></div><span class="shot-star">✦</span>
+          </div>
+          <div class="cap"><span>moon-blossom.png</span><b>30 min</b></div>
+        </div>
+
+        <div class="win ghost-term">
+          <div class="winbar"><span class="dot a"></span><span class="dot b"></span><span class="dot c"></span><span class="tt">ghostty</span><span class="ic"></span></div>
+          <div class="in">
+            <div><span class="p2">❯</span> <span class="c-milk">ls wallpapers/</span></div>
+            <div><span class="c-peri">clouds.png</span> <span class="c-candy">moon.png</span> <span class="c-lilac">ribbon.png</span></div>
+            <div><span class="c-peri">bubbles.png</span> <span class="c-candy">bow.png</span> <span class="c-mint">install.sh</span></div>
+            <div><span class="p2">❯</span> <span class="c-milk">git status -s</span></div>
+            <div><span class="c-butter"> M</span> <span class="c-smoke">install.sh</span></div>
+            <div><span class="p2">❯</span> <span class="c-dim">▌</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="launcher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg></div>
+          <div class="psep"></div>
+          <div class="app f1 active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg></div>
+          <div class="app f2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg></div>
+          <div class="app f3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18-2.5-2.6-2.5-15.4 0-18Z"/></svg></div>
+          <div class="app f4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></div>
+          <div class="clock"><b>18:42</b><span>Tue 23 Nov</span></div>
+          <div class="tray">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9a12 12 0 0 1 16 0M7 12.5a8 8 0 0 1 10 0M10 16a3.5 3.5 0 0 1 4 0"/><circle cx="12" cy="19" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg>
+            <svg class="bat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="16" height="9" rx="2"/><path d="M21 11v4"/><path d="M6 11v3M9 11v3M12 11v3" stroke-width="1.5"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens" aria-labelledby="screens-title">
+    <div class="sec-head">
+      <h2 id="screens-title">Before you log in</h2>
+      <p class="sub">The login screen and the boot menu get the same wallpaper and palette. No flash of stock Breeze between them.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Login, boot, and shell previews">
+      <button class="tab" role="tab" id="tab-shells" aria-controls="pane-shells" aria-selected="true" type="button">shells</button>
+      <button class="tab" role="tab" id="tab-login" aria-controls="pane-login" aria-selected="false" type="button">login</button>
+      <button class="tab" role="tab" id="tab-boot" aria-controls="pane-boot" aria-selected="false" type="button">limine</button>
+    </div>
+
+    <div class="pane" id="pane-shells" role="tabpanel" aria-labelledby="tab-shells">
+      <div class="pane-stage">
+       <div class="shells">
+        <div class="pane-box">
+          <div class="winbar"><span class="dot a"></span><span class="dot b"></span><span class="dot c"></span><span class="tt">nu · ~/rice</span><span class="ic"></span></div>
+<pre><span class="c-orchid">✨</span> <span class="c-lilac">Nu Shell</span> <span class="c-dim">v0.115.1</span> <span class="c-sea">[18:42]</span> <span class="c-dim">—</span> <span class="c-candy">pastel goth</span>
+<span class="c-mint">~/rice</span> <span class="c-dim">·</span> <span class="c-lilac">main</span>           <span class="c-dim">18:42</span>
+<span class="c-candy">λ</span> <span class="c-milk">git status -s</span>
+<span class="c-butter"> M</span> <span class="c-smoke">install.sh</span>
+<span class="c-mint">??</span> <span class="c-smoke">preview/</span>
+<span class="c-candy">λ</span> <span class="c-milk">open wallpapers/moon.png</span>
+<span class="c-dim">opening with gwenview…</span>
+<span class="c-candy">λ</span> <span class="c-dim">▌</span></pre>
+        </div>
+        <div class="pane-box">
+          <div class="winbar"><span class="dot a"></span><span class="dot b"></span><span class="dot c"></span><span class="tt">fish · fastfetch</span><span class="ic"></span></div>
+<pre><span class="c-candy">  ♥   ♥</span>       <span class="c-lilac">chain</span><span class="c-dim">@</span><span class="c-lilac">sugarplum</span>
+<span class="c-candy"> ♥♥♥ ♥♥♥</span>      <span class="c-dim">───────────────</span>
+<span class="c-candy"> ♥  ♥  ♥</span>      <span class="c-sea">OS</span>      CachyOS x86_64
+<span class="c-candy">  ♥   ♥</span>       <span class="c-sea">Kernel</span>  7.3.4-1-cachyos
+<span class="c-candy">   ♥ ♥</span>        <span class="c-sea">Shell</span>   fish 4.0
+<span class="c-candy">    ♥</span>         <span class="c-sea">WM</span>      KWin (Wayland)
+                <span class="c-sea">Theme</span>   Sugar Plum
+                <span class="c-sea">Icons</span>   Papirus-Dark
+                <span class="c-sea">Font</span>    Nunito 10
+                <span class="c-dim">▄▄▄▄▄▄▄▄▄▄▄▄▄</span>
+                <span style="color:var(--candy)">█</span><span style="color:var(--lilac)">█</span><span style="color:var(--peri)">█</span><span style="color:var(--orchid)">█</span><span style="color:var(--seafoam)">█</span><span style="color:var(--mint)">█</span><span style="color:var(--butter)">█</span><span class="c-dim">█</span></pre>
+        </div>
+        <div class="btop">
+          <div>
+            <div class="meter cpu"><span>cpu</span><span class="bar"><i></i></span><b>12%</b></div>
+            <div class="meter mem"><span>mem</span><span class="bar"><i></i></span><b>31%</b></div>
+          </div>
+          <div>
+            <div class="meter dsk"><span>disk</span><span class="bar"><i></i></span><b>43%</b></div>
+            <div class="meter tmp"><span>temp</span><span class="bar"><i></i></span><b>48°C</b></div>
+          </div>
+        </div>
+       </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-login" role="tabpanel" aria-labelledby="tab-login" hidden>
+      <div class="pane-stage">
+        <div class="login wall">
+          <div class="veil"></div>
+          <div class="brand-mini">sugar plum <i>♡</i></div>
+          <div class="bigclock"><b>18:42</b><span>Tue 23 Nov</span></div>
+          <div class="login-card">
+            <div class="avatar"><span>♡</span></div>
+            <h3>chain</h3>
+            <p>welcome back</p>
+            <div class="field"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <button class="login-btn" type="button" tabindex="-1">Sign in</button>
+            <div class="session">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+              Plasma (Wayland)
+            </div>
+          </div>
+          <div class="login-foot">Plasma Login · wallpaper synced from Sugar Plum</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-boot" role="tabpanel" aria-labelledby="tab-boot" hidden>
+      <div class="pane-stage">
+        <div class="boot wall">
+          <div class="veil"></div>
+          <div class="moon"></div>
+          <span class="bstar b1">✦</span><span class="bstar b2">✧</span><span class="bstar b3">✦</span>
+          <div class="boot-brand">sugar plum <i>♡</i><small>LIMINE 12.10</small></div>
+          <div class="boot-menu">
+            <div class="boot-row on"><span class="n">›</span> CachyOS Linux <span class="c-dim">7.3.4</span><span class="k">default</span></div>
+            <div class="boot-row"><span class="n">›</span> CachyOS Linux LTS <span class="c-dim">6.12</span></div>
+            <div class="boot-row"><span class="n">›</span> Snapshots</div>
+            <div class="boot-row"><span class="n">›</span> UEFI Firmware Settings</div>
+          </div>
+          <div class="boot-foot"><span><b>↑↓</b> select</span><span><b>Enter</b> boot</span><span><b>e</b> edit</span></div>
+          <div class="boot-count">booting in 3s</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="everywhere" aria-labelledby="everywhere-title">
+    <div class="sec-head">
+      <h2 id="everywhere-title">Everywhere you look</h2>
+      <p class="sub">One palette, eleven surfaces. The point isn't a themed app — it's that nothing breaks the spell.</p>
+    </div>
+    <div class="grid2">
+      <div>
+        <div class="row"><span class="dotmark" style="background:var(--candy);color:var(--candy)"></span><div><h3>Plasma shell</h3><p>Catppuccin Mocha base, Sugar Plum selection color, floating glass panel, blurred popups, rounded window decorations.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--lilac);color:var(--lilac)"></span><div><h3>Nushell</h3><p>Your existing pastel-goth prompt, retuned to the system palette: lilac path, candy git branch, periwinkle clock, orchid <code>λ</code>.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--peri);color:var(--peri)"></span><div><h3>fish</h3><p>A <code>conf.d</code> snippet, not a rewrite: colors, eza, fzf, bat, and a matching fastfetch greet.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--orchid);color:var(--orchid)"></span><div><h3>Ghostty</h3><p>Custom ANSI palette from the five pastels, candy cursor, translucent background, Nunito title.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--seafoam);color:var(--seafoam)"></span><div><h3>Dolphin + Ark</h3><p>Papirus folders in candy pink, plus real 7z right-click actions: compress, compress with password, extract here, extract to…</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--mint);color:var(--mint)"></span><div><h3>Screenshots</h3><p><code>Print</code> for region, <code>Shift+Print</code> full screen, <code>Alt+Print</code> active window — all open in satty for arrows and blur.</p></div></div>
+      </div>
+      <div>
+        <div class="row"><span class="dotmark" style="background:var(--butter);color:var(--butter)"></span><div><h3>btop</h3><p>Candy, mint, and seafoam graphs on plum. CPU, memory, disk, temp — readable at a glance.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--candy);color:var(--candy)"></span><div><h3>Neovim</h3><p>Catppuccin Mocha with Sugar Plum overrides for the cursor line, search, and statusline accents.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--lilac);color:var(--lilac)"></span><div><h3>bat · eza · fzf</h3><p>Environment colors in one shell snippet so CLI output stops looking like a different machine.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--peri);color:var(--peri)"></span><div><h3>GTK apps</h3><p>Dark Breeze base, Papirus icons, Nunito. Honest limit: libadwaita apps won't fully recolor without a GTK theme.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--orchid);color:var(--orchid)"></span><div><h3>Login screen</h3><p>Plasma Login gets the same wallpaper and dark treatment. Its 6.8 config only exposes wallpaper, not a full theme.</p></div></div>
+        <div class="row"><span class="dotmark" style="background:var(--seafoam);color:var(--seafoam)"></span><div><h3>Limine</h3><p>Pastel wallpaper, plum backdrop, candy/lilac text palette, and a small <code>sugar plum ♡</code> branding line.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="revert" aria-labelledby="revert-title">
+    <div>
+      <h2 id="revert-title">Boring on purpose</h2>
+      <p>This is a dotfiles repo with an installer, not a pile of commands someone pasted once. It keeps a ledger of every file it touches, backs up what was there, and can put it all back.</p>
+      <ol class="steps">
+        <li><b>Install.</b> <code>./install.sh</code> checks packages, backs up configs, writes marked blocks, and applies the theme.</li>
+        <li><b>Move.</b> Clone the same repo on another CachyOS/Arch box and run it again. Wallpapers and scripts travel with it.</li>
+        <li><b>Undo.</b> <code>./install.sh --revert</code> restores the backups, removes only its own files, and switches Plasma back to Breeze.</li>
+      </ol>
+    </div>
+    <div class="ledger" aria-label="Example install ledger">
+      <div class="lh"><span>install ledger</span><b>42 files · 6 backups</b></div>
+<pre><span class="ok">✓</span> kdeglobals              <span class="warn">backup</span>
+<span class="ok">✓</span> kwinrc                 <span class="warn">backup</span>
+<span class="ok">✓</span> plasma appletsrc       <span class="warn">backup</span>
+<span class="ok">✓</span> plasmalogin.conf       <span class="warn">backup</span>
+<span class="ok">✓</span> limine.conf            <span class="warn">backup</span>
+<span class="ok">✓</span> ghostty/config         <span class="cmd">include</span>
+<span class="ok">✓</span> fish/conf.d/rice.fish  <span class="cmd">new</span>
+<span class="ok">✓</span> nushell/rice.nu        <span class="cmd">new</span>
+<span class="ok">✓</span> btop theme             <span class="cmd">new</span>
+<span class="ok">✓</span> 7z servicemenu         <span class="cmd">new</span>
+<span class="ok">✓</span> wallpapers/ (6)        <span class="cmd">new</span>
+<span class="dim">→ switch Plasma accent to candy</span>
+<span class="dim">→ reload KWin · plasmashell</span></pre>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="fmono"><span class="heart">♡</span> sugar plum · built for chain</span>
+    <span>Plasma 6.8 · KWin · Wayland · no new services</span>
+    <span class="fmono">local-first · MIT</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  document.querySelectorAll('.swatch').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const hex = btn.dataset.hex;
+      try { await navigator.clipboard.writeText(hex); } catch {}
+      toast.textContent = hex + ' copied';
+      toast.classList.add('on');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('on'), 1400);
+    });
+  });
+
+  const tabs = [...document.querySelectorAll('.tab')];
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => {
+        const on = t === tab;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      });
+    });
+  });
+
+  document.getElementById('revertBtn').addEventListener('click', () => {
+    document.querySelector('.revert').scrollIntoView({behavior: 'smooth'});
+  });
+</script>
+</body>
+</html>

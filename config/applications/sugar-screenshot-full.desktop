@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Sugar Screenshot (Full Screen)
+Exec=@BIN@ full
+Icon=camera-photo
+Terminal=false
+NoDisplay=true
+StartupNotify=false
+X-KDE-GlobalAccel-CommandShortcut=true
+X-KDE-Shortcuts=Shift+Print
