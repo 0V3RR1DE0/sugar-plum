@@ -49,10 +49,8 @@ PlasmoidItem {
                     property int taskIndex: index
                     property bool active: model.IsActive ? true : false
                     property bool minimized: model.IsMinimized ? true : false
-                    property bool running: model.IsWindow ? true : (model.IsGroupParent ? true : ((model.ChildCount || 0) > 0))
                     property bool launcher: model.IsLauncher ? true : false
-                    property bool idleLauncher: model.IsLauncher && label.indexOf("(Launcher)") >= 0
-                    property bool open: !idleLauncher && (model.IsWindow || model.IsGroupParent || (model.ChildCount || 0) > 0 || model.IsLauncher)
+                    property bool open: model.IsWindow ? true : (model.IsGroupParent ? true : ((model.ChildCount || 0) > 0))
                     property string label: model.display || ""
 
                     Rectangle {
@@ -70,22 +68,29 @@ PlasmoidItem {
                         height: 24
                         source: model.decoration
                         smooth: true
-                        visible: !taskItem.open
                         opacity: taskItem.minimized ? 0.5 : 1.0
                     }
 
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 5
+                    Rectangle {
                         visible: taskItem.open
-                        Repeater {
-                            model: 3
-                            Rectangle {
-                                width: 7
-                                height: 7
-                                radius: 4
-                                color: ["#ffb3d9", "#f7e1b5", "#b8e6c8"][index]
-                                opacity: taskItem.active ? 1.0 : (taskItem.minimized ? 0.35 : 0.8)
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        width: 18
+                        height: 8
+                        radius: 4
+                        color: Qt.rgba(0.10, 0.09, 0.14, 0.88)
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 1
+                            Repeater {
+                                model: 3
+                                Rectangle {
+                                    width: 4
+                                    height: 4
+                                    radius: 2
+                                    color: ["#ffb3d9", "#f7e1b5", "#b8e6c8"][index]
+                                }
                             }
                         }
                     }
@@ -102,7 +107,7 @@ PlasmoidItem {
                                 tasksModel.requestClose(idx);
                             } else if (taskItem.active) {
                                 tasksModel.requestToggleMinimized(idx);
-                            } else if (taskItem.launcher && taskItem.idleLauncher) {
+                            } else if (taskItem.launcher && !taskItem.open) {
                                 tasksModel.requestNewInstance(idx);
                             } else {
                                 tasksModel.requestActivate(idx);
