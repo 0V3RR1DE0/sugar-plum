@@ -218,6 +218,10 @@ apply_kde() {
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key BorderSizeAuto true
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnLeft ""
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight IAX
+  link_file "$REPO/config/kwin/decorations/org.sugarplum.decoration" \
+    "$HOME/.local/share/kwin/decorations/org.sugarplum.decoration"
+  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme org.sugarplum.decoration
+  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
   local e
   for e in blur glide magiclamp wobblywindows slidingpopups; do
     kwriteconfig6 --file kwinrc --group Plugins --key "${e}Enabled" true

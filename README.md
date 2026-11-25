@@ -6,9 +6,12 @@ that was already in the user's Nushell prompt.
 ## What it changes
 
 - **Plasma:** Catppuccin Mocha structure, a Sugar Plum colour scheme, Nunito 10,
-  Papirus-Dark with candy folders, Breeze window buttons on the right in
-  Minimize → Maximize → Close order, a full-width translucent taskbar, blur,
+  Papirus-Dark with candy folders, a full-width translucent taskbar, blur,
   Glide, Magic Lamp and Wobbly Windows.
+- **Window decoration:** a small QML decoration (`org.sugarplum.decoration`)
+  with three inert pastel dots on the left and Breeze-style Minimize →
+  Maximize → Close buttons on the right. KDE-decorated windows only; apps with
+  client-side titlebars keep their own.
 - **Taskbar (`org.sugarplum.dots`):** real app icons; a three-dot badge at the
   top-right of an app's icon when it is open; stable manual order; middle-click
   closes; scroll/click activates. The pinned list lives in
@@ -73,9 +76,10 @@ pkexec ~/sugar-plum/system/install-system.sh revert
 - Plasma Login Manager 6.8 only exposes a wallpaper; the greeter remains Breeze.
 - Limine is text-based; the theme is wallpaper + terminal palette + branding.
 - Third-party KWin effects are deliberately avoided (NVIDIA Wayland stability).
-- Window titlebar dots: KDE-decorated windows use Breeze controls. Apps that draw
-  their own titlebar (OpenCode, Chromium, Zen, Electron) ignore KDE decorations,
-  so their top-left icon and hover-only controls cannot be changed from here.
+- Window titlebar dots: the QML decoration covers KDE-decorated windows. Apps
+  that draw their own titlebar (OpenCode, Chromium, Zen, Electron) ignore KDE
+  decorations, so their titlebar cannot be changed from here. Run
+  `./install.sh --revert` to return to stock Breeze.
 - The desktop shortcut arrows are drawn by Plasma's Folder View; the icon files
   are translucent but that overlay is not part of the icon theme.
 - RAR creation needs the proprietary `rar` package; extraction works with

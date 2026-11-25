@@ -1,0 +1,15 @@
+{
+    "KPackageStructure": "KWin/Decoration",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Sugar Plum"
+            }
+        ],
+        "Description": "Sugar Plum dark decoration with pastel dots",
+        "Id": "org.sugarplum.decoration",
+        "License": "GPL",
+        "Name": "Sugar Plum",
+        "Version": "1.0"
+    }
+}
