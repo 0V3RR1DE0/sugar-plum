@@ -81,8 +81,9 @@ pkexec ~/sugar-plum/system/install-system.sh revert
   that draw their own titlebar (OpenCode, Chromium, Zen, Electron) ignore KDE
   decorations, so their titlebar cannot be changed from here. Run
   `./install.sh --revert` to return to stock Breeze.
-- The desktop shortcut arrows are drawn by Plasma's Folder View; the icon files
-  are translucent but that overlay is not part of the icon theme.
+- Desktop icons are faded to 60% by `bin/desktop-icons`; shortcut arrows are
+  hidden with a transparent theme emblem. If arrows return after an icon-theme
+  change, rerun `./bin/desktop-icons apply`.
 - RAR creation is not offered (it needs the proprietary `rar` package);
   extraction works with `unrar` and falls back to 7z.
 - The 7z quick actions open a Ghostty window for the live log and close on

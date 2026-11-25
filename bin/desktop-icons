@@ -10,7 +10,7 @@ DESKTOP="$(xdg-user-dir DESKTOP 2>/dev/null || printf '%s/Desktop' "$HOME")"
 BACKUPS="$REPO/backups/desktop-originals"
 STATE="$REPO/state/desktop.tsv"
 ICONS="$HOME/.local/share/icons/SugarPlum-Desktop"
-OPACITY="0.82"
+OPACITY="0.60"
 MODE="${1:-apply}"
 
 say()  { printf '\033[38;5;218m▸\033[0m %s\n' "$*"; }
@@ -50,7 +50,13 @@ make_translucent() {
 import re, sys, pathlib
 src, dest, opacity = sys.argv[1:4]
 text = pathlib.Path(src).read_text(errors="replace")
-text = re.sub(r"<svg\b", f'<svg opacity="{opacity}"', text, count=1)
+# Root opacity does not compose reliably in Qt's SVG renderer; wrap the
+# document content so the whole icon is faded once.
+text = re.sub(r'(<svg\b[^>]*?)\s+opacity="[^"]*"', r'\1', text, count=1)
+text = re.sub(r'(<svg\b[^>]*?>)', rf'\1<g opacity="{opacity}">', text, count=1)
+end = text.rfind("</svg>")
+if end != -1:
+    text = text[:end] + "</g></svg>" + text[end + 6:]
 pathlib.Path(dest).write_text(text)
 PY
       printf '%s' "$ICONS/$name.svg"
@@ -71,7 +77,7 @@ apply_desktop() {
   [ -d "$DESKTOP" ] || return 0
   mkdir -p "$ICONS"
   touch "$STATE"
-  local f target name icon src dest tmp
+  local f target name icon src dest tmp key
   for f in "$DESKTOP"/*.desktop; do
     [ -e "$f" ] || continue
     backup_once "$f"
@@ -80,6 +86,16 @@ apply_desktop() {
     [ -f "$target" ] || continue
 
     icon="$(sed -n 's/^Icon=//p' "$target" | head -n1)"
+    # A previous pass rewrote Icon= to our generated file; recover the real
+    # icon name from the original launcher so a rerun can rebuild it.
+    case "$icon" in
+      "$ICONS"/*)
+        key="$(printf '%s' "$f" | sed 's|/|__|g')"
+        if [ -f "$BACKUPS/$key" ]; then
+          icon="$(sed -n 's/^Icon=//p' "$BACKUPS/$key" | head -n1)"
+        fi
+        ;;
+    esac
     dest=""
     if [ -n "$icon" ]; then
       src="$(find_icon "$icon")"
@@ -102,6 +118,10 @@ apply_desktop() {
     say "$(basename "$f") → ${dest:-unchanged icon}"
   done
   command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+  # Plasma caches Folder View QIcons; restart it so the new files are used.
+  if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active plasma-plasmashell >/dev/null 2>&1; then
+    systemctl --user restart plasma-plasmashell >/dev/null 2>&1 || true
+  fi
   ok "desktop icons translucent, shortcut arrows hidden"
 }
 
