@@ -52,7 +52,7 @@ PlasmoidItem {
                     interactive: true
                     location: Plasmoid.location
                     timeout: -1
-                    hideOnClick: true
+                    hideOnClick: false
 
                     property int taskIndex: index
                     property bool taskActive: model.IsActive ? true : false
@@ -235,6 +235,7 @@ PlasmoidItem {
                     TapHandler {
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                         onTapped: (eventPoint, button) => {
+                            taskItem.hideImmediately()
                             var idx = tasksModel.index(taskItem.taskIndex, 0)
                             if (button === Qt.MiddleButton) {
                                 tasksModel.requestClose(idx)
