@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="Style" type="String">
+      <label>Visual style</label>
+      <default>dusk</default>
+    </entry>
+    <entry name="Speed" type="Double">
+      <label>Animation speed</label>
+      <default>1.0</default>
+      <min>0.2</min>
+      <max>2.0</max>
+    </entry>
+    <entry name="Intensity" type="Double">
+      <label>Glow intensity</label>
+      <default>1.0</default>
+      <min>0.4</min>
+      <max>1.6</max>
+    </entry>
+    <entry name="Stars" type="Bool">
+      <label>Show stars</label>
+      <default>true</default>
+    </entry>
+    <entry name="PauseOnCover" type="Bool">
+      <label>Pause animation when the desktop is covered</label>
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>
