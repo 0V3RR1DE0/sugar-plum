@@ -12,8 +12,7 @@ PlasmoidItem {
     id: root
     preferredRepresentation: fullRepresentation
 
-    // Edit this list to change the pinned apps.
-    readonly property var pinned: [
+    readonly property var defaultPinned: [
         "applications:systemsettings.desktop",
         "applications:org.kde.dolphin.desktop",
         "applications:codium.desktop",
@@ -22,6 +21,89 @@ PlasmoidItem {
         "applications:spotify-launcher.desktop",
         "applications:obsidian.desktop"
     ]
+
+    readonly property var pinned: {
+        var configured = Plasmoid.configuration.Launchers
+        return (configured && configured.length) ? configured : defaultPinned
+    }
+
+    property bool dragActive: false
+    property int dragIndex: -1
+    property var dragIcon
+    property real dragX: 0
+    property real dragY: 0
+
+    function launcherKey(url) {
+        var s = String(url || "")
+        if (s.indexOf("applications:") === 0) {
+            s = s.substring(13)
+        } else if (s.indexOf("file://") === 0) {
+            s = s.substring(7)
+        }
+        s = s.replace(/\.desktop$/, "")
+        var slash = s.lastIndexOf("/")
+        if (slash >= 0) {
+            s = s.substring(slash + 1)
+        }
+        return s
+    }
+
+    function sameLauncher(a, b) {
+        return launcherKey(a) === launcherKey(b)
+    }
+
+    function savePinned(list) {
+        Plasmoid.configuration.Launchers = list
+        if (Plasmoid.configuration.writeConfig) {
+            Plasmoid.configuration.writeConfig()
+        }
+    }
+
+    function togglePin(item) {
+        if (!item || !item.launcherUrl) {
+            return
+        }
+        var list = pinned.slice()
+        if (item.isPinned) {
+            list = list.filter(function (url) { return !sameLauncher(url, item.launcherUrl) })
+            tasksModel.requestRemoveLauncher(item.launcherUrl)
+        } else {
+            list.push(item.launcherUrl)
+            tasksModel.requestAddLauncher(item.launcherUrl)
+        }
+        savePinned(list)
+    }
+
+    function finishDrag(from, target) {
+        if (from < 0 || target < 0 || from === target) {
+            return
+        }
+        var fromIdx = tasksModel.index(from, 0)
+        var toIdx = tasksModel.index(target, 0)
+        var fromUrl = String(tasksModel.data(fromIdx, TaskManager.TasksModel.LauncherUrlWithoutIcon) || "")
+        var toUrl = String(tasksModel.data(toIdx, TaskManager.TasksModel.LauncherUrlWithoutIcon) || "")
+        var fromLauncher = tasksModel.data(fromIdx, TaskManager.TasksModel.IsLauncher)
+            || tasksModel.data(fromIdx, TaskManager.TasksModel.HasLauncher)
+        var toLauncher = tasksModel.data(toIdx, TaskManager.TasksModel.IsLauncher)
+            || tasksModel.data(toIdx, TaskManager.TasksModel.HasLauncher)
+
+        if (fromLauncher && toLauncher && fromUrl && toUrl) {
+            var list = pinned.slice()
+            var a = -1
+            var b = -1
+            for (var i = 0; i < list.length; ++i) {
+                if (sameLauncher(list[i], fromUrl)) a = i
+                if (sameLauncher(list[i], toUrl)) b = i
+            }
+            if (a >= 0 && b >= 0) {
+                var moved = list.splice(a, 1)[0]
+                list.splice(b, 0, moved)
+                savePinned(list)
+            }
+            return
+        }
+        tasksModel.move(from, target)
+    }
 
     fullRepresentation: RowLayout {
         Layout.fillWidth: true
@@ -66,6 +148,8 @@ PlasmoidItem {
                     property var appIcon: model.decoration
                     property var winIdList: model.WinIdList
                     property int childCount: model.ChildCount || 0
+                    property bool isPinned: (model.IsLauncher === true || model.HasLauncher === true)
+                    property string launcherUrl: String(model.LauncherUrlWithoutIcon || model.LauncherUrl || "")
 
                     function childIndex(row) {
                         return tasksModel.makeModelIndex(taskItem.taskIndex, row)
@@ -248,10 +332,34 @@ PlasmoidItem {
                         }
                     }
 
+                    PlasmaComponents.Menu {
+                        id: taskMenu
+
+                        PlasmaComponents.MenuItem {
+                            text: taskItem.isPinned ? "Unpin from Taskbar" : "Pin to Taskbar"
+                            icon.name: taskItem.isPinned ? "pin-remove" : "pin"
+                            enabled: taskItem.launcherUrl.length > 0
+                            onClicked: root.togglePin(taskItem)
+                        }
+
+                        PlasmaComponents.MenuSeparator {}
+
+                        PlasmaComponents.MenuItem {
+                            text: "Close"
+                            icon.name: "window-close"
+                            enabled: taskItem.open
+                            onClicked: tasksModel.requestClose(tasksModel.index(taskItem.taskIndex, 0))
+                        }
+                    }
+
                     TapHandler {
-                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                         onTapped: (eventPoint, button) => {
                             taskItem.hideImmediately()
+                            if (button === Qt.RightButton) {
+                                taskMenu.open()
+                                return
+                            }
                             var idx = tasksModel.index(taskItem.taskIndex, 0)
                             if (button === Qt.MiddleButton) {
                                 tasksModel.requestClose(idx)
@@ -276,6 +384,38 @@ PlasmoidItem {
                             }
                         }
                     }
+
+                    DragHandler {
+                        id: dragHandler
+                        target: null
+
+                        onActiveChanged: {
+                            if (active) {
+                                root.dragIndex = taskItem.taskIndex
+                                root.dragIcon = taskItem.appIcon
+                                root.dragActive = true
+                                var p = root.mapFromItem(null, centroid.scenePosition)
+                                root.dragX = p.x
+                                root.dragY = p.y
+                            } else {
+                                var from = root.dragIndex
+                                root.dragActive = false
+                                root.dragIndex = -1
+                                var p = apps.mapFromItem(null, centroid.scenePosition)
+                                var target = Math.floor(p.x / 38)
+                                target = Math.max(0, Math.min(tasksModel.count - 1, target))
+                                root.finishDrag(from, target)
+                            }
+                        }
+
+                        onCentroidChanged: {
+                            if (active) {
+                                var p = root.mapFromItem(null, centroid.scenePosition)
+                                root.dragX = p.x
+                                root.dragY = p.y
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -284,4 +424,16 @@ PlasmoidItem {
             Layout.fillWidth: true
         }
     }
+    Kirigami.Icon {
+        id: dragGhost
+        visible: root.dragActive
+        width: 26
+        height: 26
+        source: root.dragIcon
+        x: root.dragX - width / 2
+        y: root.dragY - height / 2
+        z: 100
+        opacity: 0.85
+    }
+
 }

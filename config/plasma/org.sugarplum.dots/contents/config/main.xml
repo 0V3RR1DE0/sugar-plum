@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="Launchers" type="StringList">
+      <label>Pinned applications</label>
+      <default>applications:systemsettings.desktop,applications:org.kde.dolphin.desktop,applications:codium.desktop,applications:com.mitchellh.ghostty.desktop,applications:app.zen_browser.zen.desktop,applications:spotify-launcher.desktop,applications:obsidian.desktop</default>
+    </entry>
+  </group>
+</kcfg>
