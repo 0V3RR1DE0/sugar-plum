@@ -1,0 +1,368 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import subprocess
+import shutil
+
+from PySide6.QtWidgets import (
+    QApplication, QDialog, QVBoxLayout, QHBoxLayout,
+    QFormLayout, QLabel, QLineEdit, QPushButton,
+    QComboBox, QCheckBox, QGroupBox, QFileDialog,
+    QMessageBox, QDialogButtonBox, QProgressBar,
+    QTextEdit, QSizePolicy,
+)
+from PySide6.QtCore import Qt, QThread, Signal, QObject
+from PySide6.QtGui import QIcon, QFont
+
+
+def notify(title, body, icon="dialog-information"):
+    try:
+        subprocess.Popen(
+            ["notify-send", "-i", icon, title, body],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError:
+        pass
+
+
+def find_7z_icon():
+    candidates = [
+        "/usr/share/icons/hicolor/256x256/apps/p7zip.png",
+        "/usr/share/icons/hicolor/128x128/apps/p7zip.png",
+        "/usr/share/pixmaps/p7zip.png",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return "sugar-archive"
+
+
+PREFORMAT = "rar" if "--rar" in sys.argv else None
+FILES = [
+    (x[7:] if x.startswith("file://") else x)
+    for x in sys.argv[1:] if not x.startswith("--")
+]
+FILES = [os.path.abspath(x) for x in FILES]
+
+if not FILES:
+    sys.exit(1)
+
+
+class ArchiveWorker(QObject):
+    log      = Signal(str)
+    progress = Signal(int)
+    done     = Signal(bool, str)
+
+    def __init__(self, args, cleanup=None):
+        super().__init__()
+        self.args    = args
+        self.cleanup = cleanup or []
+
+    def run(self):
+        import re
+        output_lines = []
+        try:
+            proc = subprocess.Popen(
+                self.args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            for line in proc.stdout:
+                line = line.rstrip()
+                output_lines.append(line)
+                self.log.emit(line)
+                m = re.match(r"^\s*(\d+)%", line)
+                if m:
+                    self.progress.emit(int(m.group(1)))
+            proc.wait()
+            success = proc.returncode == 0
+        except Exception as exc:
+            output_lines.append(str(exc))
+            self.log.emit(str(exc))
+            success = False
+
+        for f in self.cleanup:
+            try:
+                os.remove(f)
+            except FileNotFoundError:
+                pass
+
+        self.done.emit(success, "\n".join(output_lines))
+
+
+class ArchiveDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Sugar Plum — Add to archive")
+        self.setWindowIcon(QIcon(find_7z_icon()))
+        self.resize(640, 580)
+        self._worker = None
+        self._thread = None
+
+        layout = QVBoxLayout(self)
+
+        archive_row = QHBoxLayout()
+        if len(FILES) > 1:
+            base = os.path.basename(os.path.dirname(FILES[0])) or "Archive"
+        else:
+            base = os.path.basename(FILES[0])
+            for ext in (".tar.gz", ".tar.xz", ".tar.bz2", ".tgz", ".txz", ".tbz2"):
+                if base.endswith(ext):
+                    base = base[:-len(ext)]
+                    break
+            else:
+                base = os.path.splitext(base)[0]
+        default = os.path.join(os.path.dirname(FILES[0]), base + ".7z")
+        self._archive = QLineEdit(default)
+        browse = QPushButton("Browse...")
+        browse.clicked.connect(self._choose_archive)
+        archive_row.addWidget(self._archive)
+        archive_row.addWidget(browse)
+        layout.addWidget(QLabel("Archive:"))
+        layout.addLayout(archive_row)
+
+        fmt_box    = QGroupBox("Format")
+        fmt_layout = QFormLayout(fmt_box)
+        self._format = QComboBox()
+        self._format.addItems(["7z", "zip", "tar", "tar.gz", "tar.xz", "tar.bz2", "rar"])
+        self._format.currentTextChanged.connect(self._on_format)
+        fmt_layout.addRow("Format:", self._format)
+        layout.addWidget(fmt_box)
+
+        comp_box    = QGroupBox("Compression")
+        comp_layout = QFormLayout(comp_box)
+        self._level = QComboBox()
+        self._level.addItems(["Store (0)", "Fastest (1)", "Fast (3)", "Normal (5)", "Maximum (7)", "Ultra (9)"])
+        self._level.setCurrentIndex(4)
+        comp_layout.addRow("Level:", self._level)
+        self._method = QComboBox()
+        self._method.addItems(["LZMA2", "LZMA", "PPMd", "BZip2"])
+        comp_layout.addRow("Method:", self._method)
+        layout.addWidget(comp_box)
+
+        enc_box    = QGroupBox("Encryption")
+        enc_layout = QFormLayout(enc_box)
+        self._encrypt = QCheckBox("Encrypt archive")
+        self._encrypt.toggled.connect(self._on_encrypt)
+        enc_layout.addRow(self._encrypt)
+        self._password = QLineEdit()
+        self._password.setEchoMode(QLineEdit.EchoMode.Password)
+        self._password.setPlaceholderText("Password")
+        enc_layout.addRow("Password:", self._password)
+        self._show_pw = QCheckBox("Show password")
+        self._show_pw.toggled.connect(
+            lambda on: self._password.setEchoMode(
+                QLineEdit.EchoMode.Normal if on else QLineEdit.EchoMode.Password
+            )
+        )
+        enc_layout.addRow(self._show_pw)
+        self._enc_names = QCheckBox("Encrypt file names")
+        self._enc_names.setChecked(True)
+        enc_layout.addRow(self._enc_names)
+        layout.addWidget(enc_box)
+
+        split_box    = QGroupBox("Split")
+        split_layout = QFormLayout(split_box)
+        self._split = QComboBox()
+        self._split.addItems(["Don't split", "10 MB", "50 MB", "100 MB", "500 MB", "1 GB", "2 GB", "4 GB", "Custom..."])
+        self._split.currentTextChanged.connect(
+            lambda v: self._custom_split.setEnabled(v == "Custom...")
+        )
+        split_layout.addRow("Volume size:", self._split)
+        self._custom_split = QLineEdit()
+        self._custom_split.setPlaceholderText("e.g. 100m, 1g")
+        self._custom_split.setEnabled(False)
+        split_layout.addRow("Custom:", self._custom_split)
+        layout.addWidget(split_box)
+
+        self._progress = QProgressBar()
+        self._progress.setRange(0, 100)
+        self._progress.setVisible(False)
+        layout.addWidget(self._progress)
+
+        self._log = QTextEdit()
+        self._log.setReadOnly(True)
+        self._log.setFont(QFont("monospace", 9))
+        self._log.setVisible(False)
+        self._log.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        layout.addWidget(self._log)
+
+        self._btns = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel | QDialogButtonBox.StandardButton.Ok
+        )
+        self._create_btn = self._btns.button(QDialogButtonBox.StandardButton.Ok)
+        self._create_btn.setText("Create")
+        self._btns.accepted.connect(self._create)
+        self._btns.rejected.connect(self.reject)
+        layout.addWidget(self._btns)
+
+        self._on_encrypt(False)
+        self._on_format("7z")
+        if PREFORMAT == "rar":
+            self._format.setCurrentText("rar")
+            self._on_format("rar")
+
+    def _choose_archive(self):
+        f, _ = QFileDialog.getSaveFileName(self, "Choose archive", self._archive.text())
+        if f:
+            self._archive.setText(f)
+
+    def _on_encrypt(self, enabled):
+        self._password.setEnabled(enabled)
+        self._show_pw.setEnabled(enabled)
+        self._enc_names.setEnabled(enabled)
+
+    def _on_format(self, fmt):
+        exts = {"7z": ".7z", "zip": ".zip", "tar": ".tar", "tar.gz": ".tar.gz", "tar.xz": ".tar.xz", "tar.bz2": ".tar.bz2", "rar": ".rar"}
+        current = self._archive.text()
+        base = current
+        for ext in exts.values():
+            if base.endswith(ext):
+                base = base[:-len(ext)]
+                break
+        self._archive.setText(base + exts.get(fmt, ".7z"))
+        self._level.setEnabled(fmt in ("7z", "zip", "rar"))
+        self._method.setEnabled(fmt == "7z")
+        can_enc = fmt in ("7z", "zip", "rar")
+        self._encrypt.setEnabled(can_enc)
+        if not can_enc:
+            self._encrypt.setChecked(False)
+
+    def _compression_level(self):
+        return [0, 1, 3, 5, 7, 9][self._level.currentIndex()]
+
+    def _volume_size(self):
+        v = self._split.currentText()
+        mapping = {"Don't split": None, "10 MB": "10m", "50 MB": "50m", "100 MB": "100m", "500 MB": "500m", "1 GB": "1g", "2 GB": "2g", "4 GB": "4g"}
+        if v == "Custom...":
+            return self._custom_split.text().strip() or None
+        return mapping.get(v)
+
+    def _append_log(self, line):
+        self._log.append(line)
+        self._log.verticalScrollBar().setValue(self._log.verticalScrollBar().maximum())
+
+    def _create(self):
+        output = self._archive.text().strip()
+        if not output:
+            QMessageBox.warning(self, "7-Zip", "Choose an archive filename.")
+            return
+        fmt      = self._format.currentText()
+        password = self._password.text() if self._encrypt.isChecked() else ""
+        volume   = self._volume_size()
+        if self._encrypt.isChecked() and not password:
+            QMessageBox.warning(self, "7-Zip", "Enter a password.")
+            return
+        if fmt == "rar" and not shutil.which("rar"):
+            QMessageBox.warning(self, "7-Zip", "RAR creation needs the proprietary `rar` package. It is not installed.")
+            return
+        args, cleanup = self._build_args(fmt, output, password, volume)
+        if args is None:
+            return
+        self._create_btn.setEnabled(False)
+        self._progress.setVisible(True)
+        self._log.setVisible(True)
+        self.resize(640, 720)
+        self._worker = ArchiveWorker(args, cleanup)
+        self._thread = QThread()
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.log.connect(self._append_log)
+        self._worker.progress.connect(self._progress.setValue)
+        self._worker.done.connect(self._on_done)
+        self._thread.start()
+
+    def _build_args(self, fmt, output, password, volume):
+        cleanup = []
+        if fmt == "7z":
+            args = ["7z", "a", "-t7z", f"-mx={self._compression_level()}"]
+            m = self._method.currentText()
+            if m == "LZMA2":   args.append("-m0=lzma2")
+            elif m == "LZMA":  args.append("-m0=lzma")
+            elif m == "PPMd":  args.append("-m0=ppmd")
+            elif m == "BZip2": args.append("-m0=bzip2")
+            if password:
+                args.append(f"-p{password}")
+                if self._enc_names.isChecked():
+                    args.append("-mhe=on")
+            if volume: args.append(f"-v{volume}")
+            args += [output, *FILES]
+        elif fmt == "zip":
+            args = ["7z", "a", "-tzip", f"-mx={self._compression_level()}"]
+            if password: args.append(f"-p{password}")
+            if volume: args.append(f"-v{volume}")
+            args += [output, *FILES]
+        elif fmt == "tar":
+            args = ["7z", "a", "-ttar", output, *FILES]
+        elif fmt == "rar":
+            rar = shutil.which("rar")
+            if not rar:
+                return None, []
+            level = min(5, max(0, self._level.currentIndex()))
+            args = [rar, "a", f"-m{level}"]
+            if password:
+                args.append(f"-hp{password}" if self._enc_names.isChecked() else f"-p{password}")
+            if volume:
+                args.append(f"-v{volume}")
+            args += [output, *FILES]
+        elif fmt in ("tar.gz", "tar.xz", "tar.bz2"):
+            tmp = output + ".tmp.tar"
+            result = subprocess.run(["7z", "a", "-ttar", tmp, *FILES], capture_output=True)
+            if result.returncode != 0:
+                QMessageBox.critical(self, "7-Zip", "Failed to create intermediate TAR.")
+                return None, []
+            cleanup.append(tmp)
+            type_map = {"tar.gz": "gzip", "tar.xz": "xz", "tar.bz2": "bzip2"}
+            args = ["7z", "a", f"-t{type_map[fmt]}", output, tmp]
+        else:
+            return None, []
+        return args, cleanup
+
+    def _on_done(self, success, output):
+        self._thread.quit()
+        self._thread.wait()
+        self._create_btn.setEnabled(True)
+        if success:
+            notify("7-Zip — Done", f"Archive created: {os.path.basename(self._archive.text())}")
+            QMessageBox.information(self, "7-Zip", "Archive created successfully.")
+            self.accept()
+        else:
+            notify("7-Zip — Failed", "Archive creation failed.", "dialog-error")
+            err = QMessageBox(self)
+            err.setWindowTitle("7-Zip — Failed")
+            err.setIcon(QMessageBox.Icon.Critical)
+            err.setText("Archive creation failed.")
+            err.setDetailedText(output[-10000:])
+            err.exec()
+
+
+
+SUGAR_STYLE = """
+QDialog, QMessageBox { background: #1e1e2e; color: #cdd6f4; }
+QLabel { color: #cdd6f4; }
+QGroupBox { border: 1px solid #313244; border-radius: 8px; margin-top: 10px; padding: 8px; }
+QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #ffb3d9; }
+QLineEdit, QComboBox, QTextEdit { background: #181825; color: #cdd6f4; border: 1px solid #313244; border-radius: 6px; padding: 4px; }
+QPushButton { background: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 6px; padding: 5px 12px; }
+QPushButton:hover { background: #45475a; }
+QPushButton:disabled { color: #6c7086; }
+QProgressBar { border: 1px solid #313244; border-radius: 6px; text-align: center; color: #cdd6f4; }
+QProgressBar::chunk { background: #ffb3d9; border-radius: 5px; }
+QCheckBox { color: #cdd6f4; }
+QScrollBar:vertical { background: #181825; width: 10px; }
+QScrollBar::handle:vertical { background: #45475a; border-radius: 5px; min-height: 20px; }
+"""
+
+app = QApplication(sys.argv)
+app.setStyle("Fusion")
+app.setFont(QFont("Nunito", 10))
+app.setStyleSheet(SUGAR_STYLE)
+app.setApplicationName("Sugar Plum 7-Zip")
+app.setWindowIcon(QIcon(find_7z_icon()))
+dialog = ArchiveDialog()
+dialog.exec()
+sys.exit(0)

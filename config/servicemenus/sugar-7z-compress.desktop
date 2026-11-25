@@ -3,10 +3,15 @@ Type=Service
 ServiceTypes=KonqPopupMenu/Plugin
 MimeType=all/allfiles;inode/directory;
 Name=7-Zip
-Actions=sevenzip;zip;targz;tar;sevenzippass;zippass;
+Actions=add;sevenzip;zip;targz;tar;rar;sevenzippass;zippass;
 X-KDE-Submenu=7-Zip
 X-KDE-Priority=TopLevel
 Icon=sugar-archive
+
+[Desktop Action add]
+Name=Add to archive…
+Icon=sugar-archive
+Exec=@GUI@ %F
 
 [Desktop Action sevenzip]
 Name=Add to archive (7z)
@@ -27,6 +32,11 @@ Exec=@BIN@ targz %F
 Name=Add to archive (tar)
 Icon=application-x-tar
 Exec=@BIN@ tar %F
+
+[Desktop Action rar]
+Name=Add to archive (RAR)…
+Icon=application-x-rar
+Exec=@GUI@ --rar %F
 
 [Desktop Action sevenzippass]
 Name=Add to archive (7z, password)…

@@ -6,7 +6,7 @@ that was already in the user's Nushell prompt.
 ## What it changes
 
 - **Plasma:** Catppuccin Mocha structure, a Sugar Plum colour scheme, Nunito 10,
-  Mignon pastel icons with a Papirus-Dark fallback, a full-width translucent taskbar, blur,
+  Mignon pastel folder icons with a Papirus-Dark fallback, a full-width translucent taskbar, blur,
   Glide and Magic Lamp.
 - **Window decoration:** a small QML decoration (`org.sugarplum.decoration`)
   with three inert pastel dots on the left and Breeze-style Minimize →
@@ -21,11 +21,12 @@ that was already in the user's Nushell prompt.
 - **Shells and CLI:** Ghostty frosted glass + Sugar Plum ANSI palette, Nushell
   env accents, fish `conf.d`, btop, bat, fzf, eza, fastfetch, LazyVim Catppuccin.
 - **Apps:** GTK gets Breeze-Dark + Papirus + Nunito; Dolphin gets one 7-Zip service
-  menu and Mignon pastel folders.
+  menu and Mignon pastel folder icons.
 - **Screenshots:** `Print` region, `Shift+Print` full screen, `Alt+Print` active
   window → satty → clipboard + `~/Pictures/Screenshots`.
-- **Wallpapers:** 8 comfy Unsplash images, random every 30 minutes. Sources in
-  `wallpapers/SOURCES.md`.
+- **Wallpaper:** Sugar Plum Aurora, an animated dark-pastel blob/star wallpaper
+  that reacts to the pointer and pauses for maximized windows. Login uses
+  CachyOS `north.png`; Limine uses CachyOS `CachyOS_Moon.jpg`.
 - **Optional system half:** login wallpaper (Plasma Login Manager 6.8 only
   exposes a wallpaper, not a full theme) and a cosmetic Limine boot theme.
 
@@ -98,10 +99,10 @@ pkexec ~/sugar-plum/system/install-system.sh revert
 
 ## Credits
 
-Catppuccin KDE, Papirus, Mignon, Satty, Unsplash, KDE Plasma, Nushell/fish.
+Catppuccin KDE, Papirus, Mignon folder icons, Satty, KDE Plasma, Nushell/fish.
 
 ## License
 
 MIT for the scripts and configuration. Fonts: SIL OFL (Nunito). Wallpapers:
-Unsplash License (see `wallpapers/SOURCES.md`). Catppuccin and Papirus retain
-their own licenses; Mignon is GPL-3.0 and is installed as a separate theme.
+Catppuccin and Papirus retain
+their own licenses. The vendored Mignon folder SVGs are GPL-3.0.

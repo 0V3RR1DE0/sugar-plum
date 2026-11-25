@@ -164,19 +164,6 @@ install_papirus() {
   ok "Papirus-Dark + candy folders"
 }
 
-install_mignon() {
-  local cache="$HOME/.cache/sugar-plum/mignon"
-  if [ ! -d "$cache/.git" ]; then
-    say "fetching Mignon pastel icons"
-    git clone --depth 1 -q https://github.com/igorfmoraes/Mignon-icon-theme "$cache" || die "Mignon clone failed"
-  fi
-  backup_once "$HOME/.local/share/icons/Mignon-pastel"
-  backup_once "$HOME/.local/share/icons/Mignon-pastel-dark"
-  ( cd "$cache" && printf 'n\n' | ./install.sh -d ) || die "Mignon install failed"
-  track_new "$HOME/.local/share/icons/Mignon-pastel" dir
-  track_new "$HOME/.local/share/icons/Mignon-pastel-dark" dir
-  ok "Mignon pastel icons"
-}
 
 install_catppuccin() {
   if [ ! -d "$CAT_CACHE/.git" ]; then
@@ -210,7 +197,6 @@ apply_kde() {
 
   install_fonts
   install_papirus
-  install_mignon
   install_catppuccin
   install_cursor
 
@@ -288,6 +274,7 @@ apply_shells() {
 apply_scripts() {
   chmod +x "$REPO/bin/7z-menu" "$REPO/bin/screenshot"
   link_file "$REPO/bin/7z-menu" "$HOME/.local/bin/sugar-7z"
+  link_file "$REPO/bin/7z-gui" "$HOME/.local/bin/sugar-7z-gui"
   link_file "$REPO/bin/screenshot" "$HOME/.local/bin/sugar-screenshot"
 
   mkdir -p "$HOME/.local/share/kio/servicemenus" "$HOME/.local/share/applications"
@@ -298,7 +285,7 @@ apply_scripts() {
   for f in "$REPO"/config/servicemenus/*.desktop; do
     dest="$HOME/.local/share/kio/servicemenus/$(basename "$f")"
     backup_once "$dest"
-    sed "s|@BIN@|$HOME/.local/bin/sugar-7z|g" "$f" > "$dest"
+    sed "s|@BIN@|$HOME/.local/bin/sugar-7z|g; s|@GUI@|$HOME/.local/bin/sugar-7z-gui|g" "$f" > "$dest"
     chmod 755 "$dest"
     track_new "$dest" file
   done
@@ -430,15 +417,30 @@ PY
 }
 
 apply_wallpaper() {
-  local dest="$HOME/Pictures/Wallpapers/SugarPlum"
-  if [ -L "$dest" ] || [ ! -e "$dest" ]; then
-    link_file "$REPO/wallpapers" "$dest"
-  else
-    warn "$dest exists and is not a symlink; using the repo folder directly"
+  local build="$HOME/.cache/sugar-plum/aurora-build"
+  local module="$HOME/.local/lib/qt6/qml/org/sugarplum/cursor"
+  if ! command -v cmake >/dev/null 2>&1 || ! pkg-config --exists Qt6Quick 2>/dev/null; then
+    warn "Qt6 build tools missing; falling back to the static CachyOS wallpaper"
+    have plasma-apply-wallpaperimage && plasma-apply-wallpaperimage -f preserveAspectCrop /usr/share/wallpapers/cachyos-wallpapers/north.png >/dev/null 2>&1 || true
+    return 0
   fi
-  pgrep -x plasmashell >/dev/null 2>&1 || return 0
-  local js; js="var root = \"$REPO/wallpapers\"; var ds = desktops(); for (var i=0;i<ds.length;i++) { ds[i].wallpaperPlugin = \"org.kde.slideshow\"; ds[i].currentConfigGroup = [\"Wallpaper\",\"org.kde.slideshow\",\"General\"]; ds[i].writeConfig(\"SlidePaths\", [root]); ds[i].writeConfig(\"SlideInterval\", 1800); ds[i].writeConfig(\"SlideshowMode\", 0); ds[i].writeConfig(\"FillMode\", 2); ds[i].writeConfig(\"UncheckedSlides\", []); } print(\"wall-ok\");"
-  qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "$js" >/dev/null 2>&1 && ok "wallpaper rotation every 30 min" || warn "could not set wallpaper rotation"
+  say "building Sugar Plum Aurora wallpaper"
+  rm -rf "$module"
+  cmake -S "$REPO/config/plasma/org.sugarplum.aurora/plugin" -B "$build" \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/.local" >/dev/null 2>&1 || { warn "cursor helper configure failed"; return 0; }
+  cmake --build "$build" -j"$(nproc 2>/dev/null || echo 2)" >/dev/null 2>&1 || { warn "cursor helper build failed"; return 0; }
+  cmake --install "$build" >/dev/null 2>&1 || { warn "cursor helper install failed"; return 0; }
+  track_new "$module" dir
+  link_file "$REPO/config/plasma-workspace/env/sugar-plum-qml.sh" \
+    "$HOME/.config/plasma-workspace/env/sugar-plum-qml.sh"
+  link_file "$REPO/config/plasma/org.sugarplum.aurora" \
+    "$HOME/.local/share/plasma/wallpapers/org.sugarplum.aurora"
+  systemctl --user set-environment QML2_IMPORT_PATH="$HOME/.local/lib/qt6/qml${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}" 2>/dev/null || true
+  if pgrep -x plasmashell >/dev/null 2>&1; then
+    qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript \
+      'var ds=desktops(); for(var i=0;i<ds.length;i++){ ds[i].wallpaperPlugin="org.sugarplum.aurora"; } print("wall-ok");' >/dev/null 2>&1 \
+      && ok "animated Aurora wallpaper" || warn "could not select Aurora wallpaper"
+  fi
 }
 
 status() {
@@ -453,7 +455,8 @@ status() {
     "$HOME/.config/ghostty/sugar-plum.conf" \
     "$HOME/.config/btop/themes/sugar-plum.theme" \
     "$HOME/.config/nvim/lua/plugins/sugar-plum.lua" \
-    "$HOME/Pictures/Wallpapers/SugarPlum"; do
+    "$HOME/.local/share/plasma/wallpapers/org.sugarplum.aurora" \
+    "$HOME/.local/lib/qt6/qml/org/sugarplum/cursor"; do
     [ -e "$p" ] || [ -L "$p" ] && printf '%-38s ok\n' "${p#$HOME/}" || printf '%-38s missing\n' "${p#$HOME/}"
   done
   printf '%-38s %s\n' "color scheme" "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true)"
@@ -522,6 +525,7 @@ PY
   done
   have kbuildsycoca6 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
   have bat && bat cache --build >/dev/null 2>&1 || true
+  have plasma-apply-wallpaperimage && plasma-apply-wallpaperimage -f preserveAspectCrop /usr/share/wallpapers/cachyos-wallpapers/north.png >/dev/null 2>&1 || true
   systemctl --user restart plasma-plasmashell >/dev/null 2>&1 || true
   qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
   sleep 2
@@ -561,9 +565,9 @@ case "${1:-apply}" in
     ;;
   dry-run|--dry-run)
     echo "Would install: Nunito, satty, Papirus-Dark + candy folders"
-    echo "Would apply: Catppuccin Mocha Pink, Sugar Plum colors, Nunito, IAX buttons, blur/glide/wobble"
+    echo "Would apply: Catppuccin Mocha Pink, Sugar Plum colors, Nunito, IAX buttons, blur/glide"
     echo "Would theme: Plasma, panel (3-dot tasks), Ghostty, Nu, fish, btop, bat, fzf/eza, Neovim, GTK"
-    echo "Would add: screenshot shortcuts, 7z menu, 12-wallpaper 30-min slideshow, preview"
+    echo "Would add: screenshot shortcuts, 7z GUI/menu, Aurora animated wallpaper, preview"
     echo "Would NOT touch: login, Limine (use --system), packages, other users"
     ;;
   --revert)

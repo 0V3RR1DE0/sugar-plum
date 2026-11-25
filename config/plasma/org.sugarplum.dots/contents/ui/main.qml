@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
@@ -98,96 +99,111 @@ PlasmoidItem {
                         return best
                     }
 
-                    mainItem: Column {
-                        width: 420
-                        spacing: 2
+                    mainItem: Flickable {
+                        id: previewFlick
+                        implicitWidth: 380
+                        implicitHeight: Math.min(previewColumn.implicitHeight, 320)
+                        width: implicitWidth
+                        height: implicitHeight
+                        contentWidth: width
+                        contentHeight: previewColumn.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
 
-                        Repeater {
-                            model: taskItem.childCount > 0 ? taskItem.childCount : 1
+                        Column {
+                            id: previewColumn
+                            width: 380
+                            spacing: 2
 
-                            delegate: Item {
-                                id: windowRow
-                                width: 420
-                                height: 80
-                                property var childIdx: taskItem.windowIndex(index)
-                                property string winUuid: taskItem.winIdList && taskItem.winIdList.length > index
-                                    ? String(taskItem.winIdList[index])
-                                    : (taskItem.winIdList && taskItem.winIdList.length ? String(taskItem.winIdList[0]) : "")
-                                property bool rowActive: tasksModel.data(childIdx, TaskManager.TasksModel.IsActive)
-                                property bool previewActive: taskItem.containsMouse || taskItem.tooltipOpen
+                            Repeater {
+                                model: taskItem.childCount > 0 ? taskItem.childCount : 1
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 5
-                                    color: windowRow.rowActive
-                                        ? Qt.rgba(1, 1, 1, 0.10)
-                                        : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
-                                }
-
-                                Item {
-                                    id: thumb
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 4
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 128
-                                    height: 72
+                                delegate: Item {
+                                    id: windowRow
+                                    width: 380
+                                    height: 64
+                                    property var childIdx: taskItem.windowIndex(index)
+                                    property string winUuid: taskItem.winIdList && taskItem.winIdList.length > index
+                                        ? String(taskItem.winIdList[index])
+                                        : (taskItem.winIdList && taskItem.winIdList.length ? String(taskItem.winIdList[0]) : "")
+                                    property bool rowActive: tasksModel.data(childIdx, TaskManager.TasksModel.IsActive)
+                                    property bool previewActive: taskItem.containsMouse || taskItem.tooltipOpen
 
                                     Rectangle {
                                         anchors.fill: parent
-                                        radius: 4
-                                        color: "#11111b"
-                                        border.width: 1
-                                        border.color: "#313244"
+                                        radius: 5
+                                        color: windowRow.rowActive
+                                            ? Qt.rgba(1, 1, 1, 0.10)
+                                            : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
                                     }
 
-                                    TaskManager.ScreencastingRequest {
-                                        id: screencast
-                                        uuid: windowRow.previewActive ? windowRow.winUuid : ""
-                                    }
+                                    Item {
+                                        id: thumb
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 4
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 112
+                                        height: 63
 
-                                    Loader {
-                                        id: thumbLoader
-                                        anchors.fill: parent
-                                        active: windowRow.previewActive && screencast.nodeId > 0
-                                        sourceComponent: Component {
-                                            PipeWire.PipeWireSourceItem {
-                                                nodeId: screencast.nodeId
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 4
+                                            color: "#11111b"
+                                            border.width: 1
+                                            border.color: "#313244"
+                                        }
+
+                                        TaskManager.ScreencastingRequest {
+                                            id: screencast
+                                            uuid: windowRow.previewActive ? windowRow.winUuid : ""
+                                        }
+
+                                        Loader {
+                                            id: thumbLoader
+                                            anchors.fill: parent
+                                            active: windowRow.previewActive && screencast.nodeId > 0
+                                            sourceComponent: Component {
+                                                PipeWire.PipeWireSourceItem {
+                                                    nodeId: screencast.nodeId
+                                                }
                                             }
+                                        }
+
+                                        Kirigami.Icon {
+                                            anchors.centerIn: parent
+                                            width: 36
+                                            height: 36
+                                            source: taskItem.appIcon
+                                            visible: screencast.nodeId === 0
                                         }
                                     }
 
-                                    Kirigami.Icon {
-                                        anchors.centerIn: parent
-                                        width: 40
-                                        height: 40
-                                        source: taskItem.appIcon
-                                        visible: screencast.nodeId === 0
+                                    Text {
+                                        anchors.left: thumb.right
+                                        anchors.leftMargin: 8
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: tasksModel.data(windowRow.childIdx, Qt.DisplayRole) || ""
+                                        color: Kirigami.Theme.textColor
+                                        elide: Text.ElideRight
+                                        font: Kirigami.Theme.smallFont
                                     }
-                                }
 
-                                Text {
-                                    anchors.left: thumb.right
-                                    anchors.leftMargin: 8
-                                    anchors.right: parent.right
-                                    anchors.rightMargin: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: tasksModel.data(windowRow.childIdx, Qt.DisplayRole) || ""
-                                    color: Kirigami.Theme.textColor
-                                    elide: Text.ElideRight
-                                    font: Kirigami.Theme.defaultFont
-                                }
-
-                                MouseArea {
-                                    id: rowMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    onClicked: {
-                                        tasksModel.requestActivate(windowRow.childIdx)
-                                        taskItem.hideImmediately()
+                                    MouseArea {
+                                        id: rowMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: {
+                                            tasksModel.requestActivate(windowRow.childIdx)
+                                            taskItem.hideImmediately()
+                                        }
                                     }
                                 }
                             }
                         }
+
+                        QQC2.ScrollBar.vertical: QQC2.ScrollBar { }
                     }
 
                     Rectangle {

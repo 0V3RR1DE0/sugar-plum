@@ -1,0 +1,12 @@
+{
+    "KPackageStructure": "Plasma/Wallpaper",
+    "KPlugin": {
+        "Id": "org.sugarplum.aurora",
+        "Name": "Sugar Plum Aurora",
+        "Description": "Pastel gradient blobs and stars that react to the pointer",
+        "Version": "1.0",
+        "License": "MIT",
+        "EnabledByDefault": true
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

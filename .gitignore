@@ -2,3 +2,5 @@ backups/
 state/
 __pycache__/
 *.log
+config/plasma/org.sugarplum.aurora/plugin/build/
+*.qmlls.build.ini
