@@ -13,11 +13,11 @@ that was already in the user's Nushell prompt.
   Maximize → Close buttons on the right. KDE-decorated windows only; apps with
   client-side titlebars keep their own.
 - **Taskbar (`org.sugarplum.dots`):** real app icons; a three-dot badge at the
-  top-right of an app's icon when it is open; stable manual order; clicking a
-  grouped app cycles its windows; hovering shows live window thumbnails
-  with a click-to-focus list;
-  middle-click closes. The pinned list lives in
-  `config/plasma/org.sugarplum.dots/contents/ui/main.qml`.
+  top-right of an app's icon when it is open; clicking a grouped app cycles
+  its windows; hovering shows live window thumbnails with a click-to-focus
+  list; middle-click closes. Drag a pinned icon to reorder it, right-click a
+  task for the full task menu or to pin/unpin it, and icons auto-shrink to fit
+  the taskbar. The pinned list persists in the applet configuration.
 - **Shells and CLI:** Ghostty frosted glass + Sugar Plum ANSI palette, Nushell
   env accents, fish `conf.d`, btop, bat, fzf, eza, fastfetch, LazyVim Catppuccin.
 - **Apps:** GTK gets Breeze-Dark + Papirus + Nunito; Dolphin gets one 7-Zip service

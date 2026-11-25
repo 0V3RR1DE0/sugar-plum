@@ -3,8 +3,8 @@ import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.extras as PlasmaExtras
 import org.kde.pipewire 1.0 as PipeWire
 import org.kde.taskmanager as TaskManager
 
@@ -12,20 +12,7 @@ PlasmoidItem {
     id: root
     preferredRepresentation: fullRepresentation
 
-    readonly property var defaultPinned: [
-        "applications:systemsettings.desktop",
-        "applications:org.kde.dolphin.desktop",
-        "applications:codium.desktop",
-        "applications:com.mitchellh.ghostty.desktop",
-        "applications:app.zen_browser.zen.desktop",
-        "applications:spotify-launcher.desktop",
-        "applications:obsidian.desktop"
-    ]
-
-    readonly property var pinned: {
-        var configured = Plasmoid.configuration.Launchers
-        return (configured && configured.length) ? configured : defaultPinned
-    }
+    readonly property var pinned: Plasmoid.configuration.Launchers || []
 
     property bool dragActive: false
     property int dragIndex: -1
@@ -46,47 +33,6 @@ PlasmoidItem {
         groupMode: TaskManager.TasksModel.GroupApplications
         separateLaunchers: false
         launcherList: root.pinned
-    }
-
-    property bool normalizing: false
-
-    Connections {
-        target: taskModel
-        function onCountChanged() {
-            Qt.callLater(root.normalizeOrder)
-        }
-    }
-
-    Component.onCompleted: Qt.callLater(root.normalizeOrder)
-
-    function normalizeOrder() {
-        if (root.normalizing) {
-            return
-        }
-        root.normalizing = true
-
-        var keys = []
-        for (var i = 0; i < root.pinned.length; ++i) {
-            keys.push(root.launcherKey(root.pinned[i]))
-        }
-
-        for (var pos = 0; pos < keys.length && pos < taskModel.count; ++pos) {
-            var found = -1
-            for (var row = pos; row < taskModel.count; ++row) {
-                var idx = taskModel.index(row, 0)
-                var appId = String(taskModel.data(idx, TaskManager.TasksModel.AppId) || "")
-                var launcherUrl = String(taskModel.data(idx, TaskManager.TasksModel.LauncherUrlWithoutIcon) || "")
-                if (appId === keys[pos] || root.launcherKey(launcherUrl) === keys[pos]) {
-                    found = row
-                    break
-                }
-            }
-            if (found > pos) {
-                taskModel.move(found, pos)
-            }
-        }
-
-        root.normalizing = false
     }
 
     function launcherKey(url) {
@@ -113,7 +59,6 @@ PlasmoidItem {
         if (Plasmoid.configuration.writeConfig) {
             Plasmoid.configuration.writeConfig()
         }
-        Qt.callLater(root.normalizeOrder)
     }
 
     function togglePin(item) {
@@ -137,12 +82,12 @@ PlasmoidItem {
         }
         var fromIdx = taskModel.index(from, 0)
         var toIdx = taskModel.index(target, 0)
-        var fromUrl = String(taskModel.data(fromIdx, TaskManager.TasksModel.LauncherUrlWithoutIcon) || "")
-        var toUrl = String(taskModel.data(toIdx, TaskManager.TasksModel.LauncherUrlWithoutIcon) || "")
-        var fromLauncher = taskModel.data(fromIdx, TaskManager.TasksModel.IsLauncher)
-            || taskModel.data(fromIdx, TaskManager.TasksModel.HasLauncher)
-        var toLauncher = taskModel.data(toIdx, TaskManager.TasksModel.IsLauncher)
-            || taskModel.data(toIdx, TaskManager.TasksModel.HasLauncher)
+        var fromUrl = String(taskModel.data(fromIdx, TaskManager.AbstractTasksModel.LauncherUrlWithoutIcon) || "")
+        var toUrl = String(taskModel.data(toIdx, TaskManager.AbstractTasksModel.LauncherUrlWithoutIcon) || "")
+        var fromLauncher = taskModel.data(fromIdx, TaskManager.AbstractTasksModel.IsLauncher)
+            || taskModel.data(fromIdx, TaskManager.AbstractTasksModel.HasLauncher)
+        var toLauncher = taskModel.data(toIdx, TaskManager.AbstractTasksModel.IsLauncher)
+            || taskModel.data(toIdx, TaskManager.AbstractTasksModel.HasLauncher)
 
         if (fromLauncher && toLauncher && fromUrl && toUrl) {
             var list = pinned.slice()
@@ -185,7 +130,7 @@ PlasmoidItem {
                         id: taskItem
                         width: root.slotSize
                         height: root.slotSize
-                        active: taskItem.open
+                        active: taskItem.open && taskMenu.status !== PlasmaExtras.Menu.Open
                         interactive: true
                         location: Plasmoid.location
                         timeout: -1
@@ -200,8 +145,6 @@ PlasmoidItem {
                         property bool fullScreen: model.IsFullScreen === true
                         property bool launcher: model.IsLauncher === true
                         property bool open: model.IsWindow === true ? true : (model.IsGroupParent === true ? true : ((model.ChildCount || 0) > 0))
-                        property string label: model.display || ""
-                        property var appIcon: model.decoration
                         property var winIdList: model.WinIdList
                         property int childCount: model.ChildCount || 0
                         property string appId: String(model.AppId || "")
@@ -214,15 +157,13 @@ PlasmoidItem {
                             }
                             return false
                         }
-                        property bool isPinned: model.IsLauncher === true || model.HasLauncher === true || taskItem.pinnedByList
+                        property bool isPinned: model.IsLauncher === true || taskItem.pinnedByList
                         property string launcherUrl: taskItem.rawLauncherUrl.length > 0
                             ? taskItem.rawLauncherUrl
                             : (taskItem.appId.length > 0 ? "applications:" + taskItem.appId + ".desktop" : "")
-                        property var iconSource: taskItem.appId === "com.mitchellh.ghostty"
-                            ? Qt.resolvedUrl("ghostty.svg")
-                            : (taskItem.pinnedByList && taskItem.appId.length > 0
-                                ? taskItem.appId
-                                : model.decoration)
+                        property var iconSource: taskItem.pinnedByList && taskItem.appId.length > 0
+                            ? taskItem.appId
+                            : model.decoration
 
                         function childIndex(row) {
                             return taskModel.makeModelIndex(taskItem.taskIndex, row)
@@ -236,7 +177,7 @@ PlasmoidItem {
 
                         function activeChild() {
                             for (var i = 0; i < taskItem.childCount; ++i) {
-                                if (taskModel.data(taskItem.childIndex(i), TaskManager.TasksModel.IsActive)) {
+                                if (taskModel.data(taskItem.childIndex(i), TaskManager.AbstractTasksModel.IsActive)) {
                                     return i
                                 }
                             }
@@ -247,7 +188,7 @@ PlasmoidItem {
                             var best = -1
                             var bestStack = -1
                             for (var i = 0; i < taskItem.childCount; ++i) {
-                                var stack = taskModel.data(taskItem.childIndex(i), TaskManager.TasksModel.StackingOrder)
+                                var stack = taskModel.data(taskItem.childIndex(i), TaskManager.AbstractTasksModel.StackingOrder)
                                 if (stack > bestStack) {
                                     bestStack = stack
                                     best = i
@@ -283,7 +224,7 @@ PlasmoidItem {
                                         property string winUuid: taskItem.winIdList && taskItem.winIdList.length > index
                                             ? String(taskItem.winIdList[index])
                                             : (taskItem.winIdList && taskItem.winIdList.length ? String(taskItem.winIdList[0]) : "")
-                                        property bool rowActive: taskModel.data(childIdx, TaskManager.TasksModel.IsActive) === true
+                                        property bool rowActive: taskModel.data(childIdx, TaskManager.AbstractTasksModel.IsActive) === true
                                         property bool previewActive: taskItem.containsMouse || taskItem.tooltipOpen
 
                                         Rectangle {
@@ -372,12 +313,13 @@ PlasmoidItem {
                                 : (taskItem.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
                         }
 
-                        Image {
+                        Kirigami.Icon {
+                            id: themedIcon
                             anchors.centerIn: parent
                             width: root.iconPx
                             height: root.iconPx
-                            source: Qt.resolvedUrl("ghostty.svg")
-                            visible: taskItem.appId === "com.mitchellh.ghostty"
+                            source: taskItem.pinnedByList && taskItem.appId.length > 0 ? taskItem.appId : ""
+                            visible: valid
                             smooth: true
                             opacity: taskItem.minimized ? 0.5 : 1.0
                         }
@@ -387,7 +329,7 @@ PlasmoidItem {
                             width: root.iconPx
                             height: root.iconPx
                             source: model.decoration
-                            visible: taskItem.appId !== "com.mitchellh.ghostty"
+                            visible: !themedIcon.valid
                             smooth: true
                             opacity: taskItem.minimized ? 0.5 : 1.0
                         }
@@ -416,67 +358,79 @@ PlasmoidItem {
                             }
                         }
 
-                        PlasmaComponents.Menu {
+                        PlasmaExtras.Menu {
                             id: taskMenu
+                            visualParent: taskItem
+                            minimumWidth: 230
+                            placement: {
+                                if (Plasmoid.location === PlasmaCore.Types.LeftEdge) {
+                                    return PlasmaExtras.Menu.RightPosedTopAlignedPopup
+                                } else if (Plasmoid.location === PlasmaCore.Types.TopEdge) {
+                                    return PlasmaExtras.Menu.BottomPosedLeftAlignedPopup
+                                } else if (Plasmoid.location === PlasmaCore.Types.RightEdge) {
+                                    return PlasmaExtras.Menu.LeftPosedTopAlignedPopup
+                                }
+                                return PlasmaExtras.Menu.TopPosedLeftAlignedPopup
+                            }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: taskItem.launcher && !taskItem.open ? "Open" : "New Window"
-                                icon.name: "window-new"
+                                icon: "window-new"
                                 onClicked: taskModel.requestNewInstance(taskModel.index(taskItem.taskIndex, 0))
                             }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: taskItem.isPinned ? "Unpin from Taskbar" : "Pin to Taskbar"
-                                icon.name: taskItem.isPinned ? "pin-remove" : "pin"
+                                icon: taskItem.isPinned ? "window-unpin" : "window-pin"
                                 enabled: taskItem.launcherUrl.length > 0
                                 onClicked: root.togglePin(taskItem)
                             }
 
-                            PlasmaComponents.MenuSeparator {}
+                            PlasmaExtras.MenuItem { separator: true }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: "Minimize"
-                                icon.name: "window-minimize"
+                                icon: "window-minimize"
                                 visible: taskItem.open
                                 enabled: !taskItem.minimized
                                 onClicked: taskModel.requestToggleMinimized(taskModel.index(taskItem.taskIndex, 0))
                             }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: taskItem.maximized ? "Restore" : "Maximize"
-                                icon.name: taskItem.maximized ? "window-restore" : "window-maximize"
+                                icon: taskItem.maximized ? "window-restore" : "window-maximize"
                                 visible: taskItem.open
                                 onClicked: taskModel.requestToggleMaximized(taskModel.index(taskItem.taskIndex, 0))
                             }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: "Move"
-                                icon.name: "transform-move"
+                                icon: "transform-move"
                                 visible: taskItem.open
                                 onClicked: taskModel.requestMove(taskModel.index(taskItem.taskIndex, 0))
                             }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: "Resize"
-                                icon.name: "transform-scale"
+                                icon: "transform-scale"
                                 visible: taskItem.open
                                 onClicked: taskModel.requestResize(taskModel.index(taskItem.taskIndex, 0))
                             }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: "Full Screen"
-                                icon.name: "view-fullscreen"
+                                icon: "view-fullscreen"
                                 visible: taskItem.open
                                 checkable: true
                                 checked: taskItem.fullScreen
                                 onClicked: taskModel.requestToggleFullScreen(taskModel.index(taskItem.taskIndex, 0))
                             }
 
-                            PlasmaComponents.MenuSeparator {}
+                            PlasmaExtras.MenuItem { separator: true }
 
-                            PlasmaComponents.MenuItem {
+                            PlasmaExtras.MenuItem {
                                 text: "Close"
-                                icon.name: "window-close"
+                                icon: "window-close"
                                 visible: taskItem.open
                                 onClicked: taskModel.requestClose(taskModel.index(taskItem.taskIndex, 0))
                             }
@@ -485,7 +439,7 @@ PlasmoidItem {
                         MouseArea {
                             id: mouseArea
                             anchors.fill: parent
-                            hoverEnabled: false
+                            hoverEnabled: true
                             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
 
                             property bool dragging: false
@@ -495,7 +449,7 @@ PlasmoidItem {
                             function doClick(button) {
                                 taskItem.hideImmediately()
                                 if (button === Qt.RightButton) {
-                                    taskMenu.open()
+                                    taskMenu.openRelative()
                                     return
                                 }
                                 var idx = taskModel.index(taskItem.taskIndex, 0)
@@ -508,7 +462,7 @@ PlasmoidItem {
                                     var next = current === -1 ? taskItem.mostRecentChild() : (current + 1) % taskItem.childCount
                                     if (next < 0) next = 0
                                     var nextIdx = taskItem.childIndex(next)
-                                    if (taskModel.data(nextIdx, TaskManager.TasksModel.IsMinimized)) {
+                                    if (taskModel.data(nextIdx, TaskManager.AbstractTasksModel.IsMinimized)) {
                                         taskModel.requestToggleMinimized(nextIdx)
                                     }
                                     taskModel.requestActivate(nextIdx)
@@ -522,18 +476,11 @@ PlasmoidItem {
                                 }
                             }
 
-                            onPressed: (mouse) => {
-                                var p = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
-                                pressX = p.x
-                                pressY = p.y
-                                dragging = false
-                            }
-
-                            onPositionChanged: (mouse) => {
+                            function updateDrag() {
                                 if (!mouseArea.pressed) {
                                     return
                                 }
-                                var p = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
+                                var p = mouseArea.mapToItem(fullRoot, mouseArea.mouseX, mouseArea.mouseY)
                                 if (!dragging && Math.abs(p.x - pressX) > 5) {
                                     dragging = true
                                     root.dragIndex = taskItem.taskIndex
@@ -548,9 +495,19 @@ PlasmoidItem {
                                 }
                             }
 
+                            onPressed: (mouse) => {
+                                var p = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
+                                pressX = p.x
+                                pressY = p.y
+                                dragging = false
+                            }
+
+                            onMouseXChanged: updateDrag()
+                            onMouseYChanged: updateDrag()
+
                             onReleased: (mouse) => {
                                 if (dragging) {
-                                    var p = mouseArea.mapToItem(apps, mouse.x, mouse.y)
+                                    var p = mouseArea.mapToItem(apps, mouseArea.mouseX, mouseArea.mouseY)
                                     var target = Math.floor(p.x / (root.slotSize + 2))
                                     target = Math.max(0, Math.min(taskModel.count - 1, target))
                                     var from = root.dragIndex
