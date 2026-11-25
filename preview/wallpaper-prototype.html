@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sugar Plum · wallpaper prototypes</title>
+<style>
+  :root {
+    --accent: #ffb3d9;
+    --ink: #cdd6f4;
+    --muted: #a6adc8;
+    --panel: rgba(17, 17, 27, .78);
+  }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+  body {
+    background: #11111b;
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    user-select: none;
+    cursor: crosshair;
+  }
+  canvas { position: fixed; inset: 0; display: block; width: 100vw; height: 100vh; }
+
+  #title {
+    position: fixed; top: 22px; left: 24px;
+    padding: 10px 14px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    background: rgba(17,17,27,.45);
+    backdrop-filter: blur(12px);
+    pointer-events: none;
+    transition: opacity .25s ease;
+  }
+  #title strong { display: block; font-size: 13px; letter-spacing: .02em; }
+  #title span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+
+  #status {
+    position: fixed; top: 22px; right: 24px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 999px;
+    background: rgba(17,17,27,.45);
+    backdrop-filter: blur(12px);
+    color: var(--muted); font-size: 11px;
+    transition: opacity .25s ease;
+  }
+  #dot { width: 7px; height: 7px; border-radius: 50%; background: #a6e3a1; box-shadow: 0 0 10px #a6e3a1; }
+  #status.paused #dot { background: #f9e2af; box-shadow: 0 0 10px #f9e2af; }
+
+  #bar {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 999px;
+    background: var(--panel);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 12px 36px rgba(0,0,0,.35);
+    z-index: 5;
+  }
+  #bar button {
+    width: 30px; height: 30px; padding: 0;
+    border: 0; border-radius: 50%;
+    background: rgba(255,255,255,.07);
+    color: var(--ink); font-size: 20px; line-height: 1;
+    cursor: pointer;
+  }
+  #bar button:hover { background: rgba(255,255,255,.14); }
+  #label { min-width: 190px; text-align: center; font-size: 12px; letter-spacing: .02em; }
+  #label b { color: var(--accent); }
+  #dots { display: flex; gap: 4px; padding-left: 4px; border-left: 1px solid rgba(255,255,255,.10); }
+  #dots button {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: transparent; color: var(--muted);
+    font-size: 10px; border: 1px solid transparent;
+  }
+  #dots button.active { color: #11111b; background: var(--accent); border-color: var(--accent); }
+  #hint {
+    position: fixed; left: 24px; bottom: 24px;
+    color: var(--muted); font-size: 11px;
+    transition: opacity .25s ease;
+    pointer-events: none;
+  }
+  #hint kbd {
+    display: inline-block; padding: 1px 5px; margin: 0 2px;
+    border: 1px solid rgba(255,255,255,.14); border-radius: 5px;
+    background: rgba(255,255,255,.06); color: var(--ink);
+    font: inherit; font-size: 10px;
+  }
+  body.hud-hidden #title, body.hud-hidden #status, body.hud-hidden #hint { opacity: 0; }
+  @media (max-width: 700px) {
+    #title { display: none; }
+    #hint { display: none; }
+    #label { min-width: 150px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div id="title">
+  <strong>Sugar Plum · wallpaper prototypes</strong>
+  <span>Move the pointer. Pick a variant below.</span>
+</div>
+
+<div id="status"><span id="dot"></span><span id="statusText">running · 30 fps</span></div>
+
+<div id="bar">
+  <button id="prev" aria-label="Previous variant">‹</button>
+  <div id="label"><b>A</b> · Aurora Veil</div>
+  <button id="next" aria-label="Next variant">›</button>
+  <div id="dots">
+    <button data-v="A" class="active">A</button>
+    <button data-v="B">B</button>
+    <button data-v="C">C</button>
+    <button data-v="D">D</button>
+  </div>
+</div>
+
+<div id="hint">
+  <kbd>←</kbd><kbd>→</kbd> switch · <kbd>H</kbd> hide info · animation pauses when this window is unfocused or hidden
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const TAU = Math.PI * 2;
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const status = document.getElementById("status");
+  const statusText = document.getElementById("statusText");
+  const label = document.getElementById("label");
+  const dots = [...document.querySelectorAll("#dots button")];
+
+  let width = 0, height = 0, dpr = 1;
+  let phase = 0, last = 0, raf = 0;
+  let paused = true, blurred = false, hidden = false;
+  const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
+  let current = new URLSearchParams(location.search).get("variant")?.toUpperCase();
+  const order = ["A", "B", "C", "D"];
+
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  function makeStars(count, seed) {
+    let s = seed >>> 0;
+    const rnd = () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+    return Array.from({ length: count }, () => ({
+      x: rnd(), y: rnd(), r: 0.35 + rnd() * 1.25,
+      o: 0.12 + rnd() * 0.45, s: 0.3 + rnd() * 1.4,
+      p: rnd() * TAU
+    }));
+  }
+
+  function glow(x, y, r, color, alpha) {
+    if (r <= 0) return;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgba(color, alpha));
+    g.addColorStop(0.42, rgba(color, alpha * 0.55));
+    g.addColorStop(0.72, rgba(color, alpha * 0.18));
+    g.addColorStop(1, rgba(color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fill();
+  }
+
+  function darkBase(top, mid, bottom) {
+    const g = ctx.createLinearGradient(0, 0, width * 0.2, height);
+    g.addColorStop(0, top); g.addColorStop(0.55, mid); g.addColorStop(1, bottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  function stars(list, alpha, twinkle = true) {
+    for (const s of list) {
+      const a = alpha * s.o * (twinkle ? (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(phase * s.s + s.p))) : 1);
+      ctx.fillStyle = `rgba(247,225,181,${a})`;
+      ctx.beginPath();
+      ctx.arc(s.x * width, s.y * height, s.r, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  function vignette(strength = 0.32) {
+    const g = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.22,
+                                       width / 2, height / 2, Math.max(width, height) * 0.78);
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(1, `rgba(0,0,0,${strength})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  const starsA = makeStars(58, 0xA11CE);
+  const starsB = makeStars(230, 0xB0B);
+  const starsC = makeStars(46, 0xC0C);
+  const starsD = makeStars(34, 0xD0D);
+
+  const variants = {
+    A: {
+      name: "Aurora Veil",
+      accent: "#ffb3d9",
+      draw() {
+        darkBase("#1e1e2e", "#181825", "#11111b");
+        ctx.globalCompositeOperation = "lighter";
+        const blobs = [
+          [0.16, 0.28, 1.02, [255,179,217], 0.44, 0.55, 0.0, 0.070],
+          [0.78, 0.22, 0.92, [200,182,226], 0.38, 0.42, 1.7, 0.055],
+          [0.60, 0.80, 1.10, [174,198,255], 0.38, 0.36, 3.1, 0.075],
+          [0.12, 0.84, 0.80, [184,230,230], 0.34, 0.61, 4.4, 0.045],
+          [0.90, 0.70, 0.68, [247,225,181], 0.30, 0.48, 2.3, 0.065],
+          [0.42, 0.08, 0.78, [245,194,231], 0.32, 0.33, 5.2, 0.050]
+        ];
+        for (const [bx, by, br, c, ba, sp, off, depth] of blobs) {
+          const x = (bx + Math.sin(phase * sp + off) * 0.035 + pointer.x * depth) * width;
+          const y = (by + Math.cos(phase * sp * 0.8 + off) * 0.030 + pointer.y * depth) * height;
+          const r = br * Math.min(width, height) * (1 + 0.065 * Math.sin(phase * sp * 1.2 + off));
+          glow(x, y, r, c, ba * (0.86 + 0.14 * Math.sin(phase * sp + 1.7)));
+        }
+        ctx.globalCompositeOperation = "source-over";
+        stars(starsA, 0.30);
+        vignette(0.34);
+      }
+    },
+
+    B: {
+      name: "Orbit / Nebula",
+      accent: "#aec6ff",
+      draw() {
+        const g = ctx.createRadialGradient(width * 0.5, height * 0.46, 0,
+                                           width * 0.5, height * 0.5, Math.max(width, height) * 0.78);
+        g.addColorStop(0, "#191426");
+        g.addColorStop(0.42, "#0e0b17");
+        g.addColorStop(1, "#06050b");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.globalCompositeOperation = "lighter";
+        glow(width * (0.50 + pointer.x * 0.020), height * (0.46 + pointer.y * 0.020),
+             Math.min(width, height) * 0.46, [200,182,226], 0.16);
+        glow(width * (0.62 + pointer.x * 0.025), height * (0.58 + pointer.y * 0.025),
+             Math.min(width, height) * 0.34, [255,179,217], 0.13);
+        glow(width * (0.38 + pointer.x * 0.030), height * (0.34 + pointer.y * 0.030),
+             Math.min(width, height) * 0.30, [174,198,255], 0.12);
+
+        const cx = width * (0.5 + pointer.x * 0.035);
+        const cy = height * (0.5 + pointer.y * 0.030);
+        const rings = [
+          { rx: 0.36, ry: 0.13, rot: -0.38, c: [255,179,217], speed: 0.10, phase: 0.0 },
+          { rx: 0.44, ry: 0.18, rot: 0.46, c: [174,198,255], speed: -0.07, phase: 1.8 },
+          { rx: 0.28, ry: 0.095, rot: 0.08, c: [184,230,230], speed: 0.14, phase: 3.2 }
+        ];
+        for (const ring of rings) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(ring.rot + phase * ring.speed * 0.16);
+          ctx.strokeStyle = rgba(ring.c, 0.16);
+          ctx.lineWidth = 1.1;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, ring.rx * width, ring.ry * height, 0, 0, TAU);
+          ctx.stroke();
+
+          for (let i = 0; i < 14; i++) {
+            const a = (i / 14) * TAU + phase * ring.speed;
+            const px = Math.cos(a) * ring.rx * width;
+            const py = Math.sin(a) * ring.ry * height;
+            ctx.fillStyle = rgba(ring.c, 0.10 + 0.10 * (0.5 + 0.5 * Math.sin(phase * 0.7 + i)));
+            ctx.beginPath();
+            ctx.arc(px, py, 1.1 + (i % 3) * 0.5, 0, TAU);
+            ctx.fill();
+          }
+
+          const a = phase * ring.speed * 1.8 + ring.phase;
+          const ox = Math.cos(a) * ring.rx * width;
+          const oy = Math.sin(a) * ring.ry * height;
+          glow(ox, oy, Math.min(width, height) * 0.045, ring.c, 0.42);
+          ctx.fillStyle = rgba(ring.c, 0.92);
+          ctx.beginPath();
+          ctx.arc(ox, oy, 3.2, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.globalCompositeOperation = "source-over";
+        stars(starsB, 0.72);
+        vignette(0.26);
+      }
+    },
+
+    C: {
+      name: "Silk Ribbons",
+      accent: "#c8b6e2",
+      draw() {
+        darkBase("#17111f", "#0f0b16", "#08060c");
+        ctx.globalCompositeOperation = "lighter";
+        ctx.lineCap = "round";
+
+        const bands = [
+          { y: 0.30, amp: 0.075, wdt: 0.16, sp: 0.24, off: 0.0, a: [255,179,217], b: [174,198,255] },
+          { y: 0.44, amp: 0.055, wdt: 0.12, sp: 0.18, off: 1.4, a: [200,182,226], b: [184,230,230] },
+          { y: 0.56, amp: 0.065, wdt: 0.13, sp: 0.21, off: 2.9, a: [174,198,255], b: [245,194,231] },
+          { y: 0.68, amp: 0.045, wdt: 0.09, sp: 0.15, off: 4.1, a: [247,225,181], b: [255,179,217] }
+        ];
+
+        for (const band of bands) {
+          const grad = ctx.createLinearGradient(0, 0, width, 0);
+          grad.addColorStop(0.00, rgba(band.a, 0));
+          grad.addColorStop(0.18, rgba(band.a, 0.12));
+          grad.addColorStop(0.48, rgba(band.b, 0.18));
+          grad.addColorStop(0.78, rgba(band.a, 0.12));
+          grad.addColorStop(1.00, rgba(band.a, 0));
+          ctx.strokeStyle = grad;
+
+          for (let pass = 0; pass < 3; pass++) {
+            ctx.globalAlpha = 0.62 - pass * 0.19;
+            ctx.lineWidth = band.wdt * height * (1 + pass * 0.7);
+            ctx.beginPath();
+            for (let x = 0; x <= width + 1; x += Math.max(12, width / 90)) {
+              const u = x / width;
+              const y = (band.y
+                + Math.sin(u * 6.2 + phase * band.sp + band.off) * band.amp
+                + Math.sin(u * 13.0 - phase * band.sp * 0.7 + band.off) * band.amp * 0.24
+                + pointer.y * 0.055) * height;
+              if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+          }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        stars(starsC, 0.26);
+        vignette(0.38);
+      }
+    },
+
+    D: {
+      name: "Quiet Dusk",
+      accent: "#f7e1b5",
+      draw() {
+        const g = ctx.createRadialGradient(width * 0.38, height * 0.42, 0,
+                                           width * 0.5, height * 0.5, Math.max(width, height) * 0.88);
+        g.addColorStop(0, "#211a2b");
+        g.addColorStop(0.55, "#15111d");
+        g.addColorStop(1, "#0a0810");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.globalCompositeOperation = "lighter";
+        glow(width * (0.16 + pointer.x * 0.020), height * (0.78 + pointer.y * 0.020),
+             Math.min(width, height) * 0.64, [255,179,217], 0.28 + 0.03 * Math.sin(phase * 0.24));
+        glow(width * (0.84 + pointer.x * 0.020), height * (0.22 + pointer.y * 0.020),
+             Math.min(width, height) * 0.58, [174,198,255], 0.25 + 0.03 * Math.sin(phase * 0.19 + 2));
+        glow(width * 0.72, height * 0.84, Math.min(width, height) * 0.30, [184,230,230], 0.12);
+        ctx.globalCompositeOperation = "source-over";
+        stars(starsD, 0.22, false);
+        vignette(0.40);
+      }
+    }
+  };
+
+  function draw() {
+    variants[current].draw();
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function setStatus(text, isPaused) {
+    statusText.textContent = text;
+    status.classList.toggle("paused", isPaused);
+  }
+
+  function loop(now) {
+    raf = 0;
+    if (paused) return;
+    if (!last) last = now;
+    if (now - last < 33) {
+      raf = requestAnimationFrame(loop);
+      return;
+    }
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    phase += dt;
+    pointer.x += (pointer.tx - pointer.x) * 0.06;
+    pointer.y += (pointer.ty - pointer.y) * 0.06;
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function start() {
+    if (raf || paused) return;
+    last = 0;
+    raf = requestAnimationFrame(loop);
+  }
+
+  function stop() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+  }
+
+  function updatePause() {
+    const shouldPause = hidden || blurred;
+    if (shouldPause === paused) return;
+    paused = shouldPause;
+    if (paused) {
+      stop();
+      setStatus(hidden ? "paused · tab hidden" : "paused · window unfocused", true);
+    } else {
+      setStatus("running · 30 fps", false);
+      start();
+    }
+  }
+
+  function setVariant(v) {
+    if (!variants[v] || v === current) return;
+    current = v;
+    phase = 0;
+    last = 0;
+    label.innerHTML = `<b>${v}</b> · ${variants[v].name}`;
+    document.documentElement.style.setProperty("--accent", variants[v].accent);
+    dots.forEach(b => b.classList.toggle("active", b.dataset.v === v));
+    history.replaceState(null, "", `?variant=${v}`);
+    draw();
+  }
+
+  window.addEventListener("resize", resize);
+  window.addEventListener("pointermove", e => {
+    pointer.tx = (e.clientX / Math.max(1, width) - 0.5);
+    pointer.ty = (e.clientY / Math.max(1, height) - 0.5);
+  }, { passive: true });
+  window.addEventListener("blur", () => { blurred = true; updatePause(); });
+  window.addEventListener("focus", () => { blurred = false; updatePause(); });
+  document.addEventListener("visibilitychange", () => { hidden = document.hidden; updatePause(); });
+
+  document.getElementById("prev").addEventListener("click", () => {
+    const i = order.indexOf(current);
+    setVariant(order[(i - 1 + order.length) % order.length]);
+  });
+  document.getElementById("next").addEventListener("click", () => {
+    const i = order.indexOf(current);
+    setVariant(order[(i + 1) % order.length]);
+  });
+  dots.forEach(b => b.addEventListener("click", () => setVariant(b.dataset.v)));
+
+  window.addEventListener("keydown", e => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (e.key === "ArrowLeft") {
+      const i = order.indexOf(current);
+      setVariant(order[(i - 1 + order.length) % order.length]);
+    } else if (e.key === "ArrowRight") {
+      const i = order.indexOf(current);
+      setVariant(order[(i + 1) % order.length]);
+    } else if (e.key === "h" || e.key === "H") {
+      document.body.classList.toggle("hud-hidden");
+    }
+  });
+
+  if (!order.includes(current)) current = "A";
+  label.innerHTML = `<b>${current}</b> · ${variants[current].name}`;
+  document.documentElement.style.setProperty("--accent", variants[current].accent);
+  dots.forEach(b => b.classList.toggle("active", b.dataset.v === current));
+  history.replaceState(null, "", `?variant=${current}`);
+
+  resize();
+  paused = false;
+  setStatus("running · 30 fps", false);
+  start();
+
+  // If this page is opened while its window is already unfocused, the browser
+  // may not send a blur event; check once after load.
+  setTimeout(() => { blurred = !document.hasFocus(); updatePause(); }, 300);
+})();
+</script>
+</body>
+</html>
