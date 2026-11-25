@@ -164,6 +164,20 @@ install_papirus() {
   ok "Papirus-Dark + candy folders"
 }
 
+install_mignon() {
+  local cache="$HOME/.cache/sugar-plum/mignon"
+  if [ ! -d "$cache/.git" ]; then
+    say "fetching Mignon pastel icons"
+    git clone --depth 1 -q https://github.com/igorfmoraes/Mignon-icon-theme "$cache" || die "Mignon clone failed"
+  fi
+  backup_once "$HOME/.local/share/icons/Mignon-pastel"
+  backup_once "$HOME/.local/share/icons/Mignon-pastel-dark"
+  ( cd "$cache" && printf 'n\n' | ./install.sh -d ) || die "Mignon install failed"
+  track_new "$HOME/.local/share/icons/Mignon-pastel" dir
+  track_new "$HOME/.local/share/icons/Mignon-pastel-dark" dir
+  ok "Mignon pastel icons"
+}
+
 install_catppuccin() {
   if [ ! -d "$CAT_CACHE/.git" ]; then
     say "fetching Catppuccin KDE"
@@ -183,7 +197,7 @@ install_cursor() {
   if [ -e "$dest" ] && [ ! -L "$dest" ]; then rm -rf "$dest"; fi
   link_file "$REPO/assets/cursors/catppuccin-mocha-pink-cursors" "$dest"
   kwriteconfig6 --file kcminputrc --group Mouse --key cursorTheme catppuccin-mocha-pink-cursors
-  kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 24
+  kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 20
   command -v plasma-apply-cursortheme >/dev/null 2>&1 && plasma-apply-cursortheme catppuccin-mocha-pink-cursors >/dev/null 2>&1 || true
   ok "Catppuccin pink cursor"
 }
@@ -196,6 +210,7 @@ apply_kde() {
 
   install_fonts
   install_papirus
+  install_mignon
   install_catppuccin
   install_cursor
 
@@ -226,6 +241,8 @@ apply_kde() {
   for e in blur glide magiclamp slidingpopups; do
     kwriteconfig6 --file kwinrc --group Plugins --key "${e}Enabled" true
   done
+  kwriteconfig6 --file kwinrc --group Plugins --key squashEnabled false
+  kwriteconfig6 --file kwinrc --group Plugins --key wobblywindowsEnabled false
   kwriteconfig6 --file kwinrc --group Effect-blur --key blurStrength 7
   kwriteconfig6 --file kwinrc --group Effect-blur --key noiseStrength 3
 
@@ -282,6 +299,7 @@ apply_scripts() {
     dest="$HOME/.local/share/kio/servicemenus/$(basename "$f")"
     backup_once "$dest"
     sed "s|@BIN@|$HOME/.local/bin/sugar-7z|g" "$f" > "$dest"
+    chmod 755 "$dest"
     track_new "$dest" file
   done
   for f in "$REPO"/config/applications/*.desktop; do
@@ -499,7 +517,7 @@ PY
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key BorderSizeAuto true
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnLeft ""
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight IAX
-  for e in blur glide magiclamp slidingpopups; do
+  for e in blur glide magiclamp slidingpopups squash wobblywindows; do
     kwriteconfig6 --file kwinrc --group Plugins --key "${e}Enabled" false
   done
   have kbuildsycoca6 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true

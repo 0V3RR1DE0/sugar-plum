@@ -6,7 +6,7 @@ that was already in the user's Nushell prompt.
 ## What it changes
 
 - **Plasma:** Catppuccin Mocha structure, a Sugar Plum colour scheme, Nunito 10,
-  Papirus-Dark with candy folders, a full-width translucent taskbar, blur,
+  Mignon pastel icons with a Papirus-Dark fallback, a full-width translucent taskbar, blur,
   Glide and Magic Lamp.
 - **Window decoration:** a small QML decoration (`org.sugarplum.decoration`)
   with three inert pastel dots on the left and Breeze-style Minimize →
@@ -14,13 +14,14 @@ that was already in the user's Nushell prompt.
   client-side titlebars keep their own.
 - **Taskbar (`org.sugarplum.dots`):** real app icons; a three-dot badge at the
   top-right of an app's icon when it is open; stable manual order; clicking a
-  grouped app cycles its windows; hovering shows a clickable window list;
+  grouped app cycles its windows; hovering shows live window thumbnails
+  with a click-to-focus list;
   middle-click closes. The pinned list lives in
   `config/plasma/org.sugarplum.dots/contents/ui/main.qml`.
 - **Shells and CLI:** Ghostty frosted glass + Sugar Plum ANSI palette, Nushell
   env accents, fish `conf.d`, btop, bat, fzf, eza, fastfetch, LazyVim Catppuccin.
-- **Apps:** GTK gets Breeze-Dark + Papirus + Nunito; Dolphin gets a 7z service
-  menu and Papirus candy folders.
+- **Apps:** GTK gets Breeze-Dark + Papirus + Nunito; Dolphin gets one 7-Zip service
+  menu and Mignon pastel folders.
 - **Screenshots:** `Print` region, `Shift+Print` full screen, `Alt+Print` active
   window → satty → clipboard + `~/Pictures/Screenshots`.
 - **Wallpapers:** 8 comfy Unsplash images, random every 30 minutes. Sources in
@@ -97,10 +98,10 @@ pkexec ~/sugar-plum/system/install-system.sh revert
 
 ## Credits
 
-Catppuccin KDE, Papirus, Satty, Unsplash, KDE Plasma, Nushell/fish.
+Catppuccin KDE, Papirus, Mignon, Satty, Unsplash, KDE Plasma, Nushell/fish.
 
 ## License
 
 MIT for the scripts and configuration. Fonts: SIL OFL (Nunito). Wallpapers:
 Unsplash License (see `wallpapers/SOURCES.md`). Catppuccin and Papirus retain
-their own licenses.
+their own licenses; Mignon is GPL-3.0 and is installed as a separate theme.

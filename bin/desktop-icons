@@ -34,6 +34,7 @@ find_icon() {
   local name="$1"
   find -L \
     "$HOME/.local/share/icons/SugarPlum" \
+    "$HOME/.local/share/icons/Mignon-pastel-dark" \
     "$HOME/.cache/sugar-plum/papirus/Papirus-Dark" \
     "$HOME/.cache/sugar-plum/papirus/Papirus" \
     "/usr/share/icons/hicolor" "/usr/share/icons/Papirus-Dark" "/usr/share/icons/Papirus" \

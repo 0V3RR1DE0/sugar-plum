@@ -6,7 +6,7 @@ Name=7-Zip
 Actions=extracthere;extractto;extractpass;
 X-KDE-Submenu=7-Zip
 X-KDE-Priority=TopLevel
-Icon=archive-extract
+Icon=sugar-archive
 
 [Desktop Action extracthere]
 Name=Extract here

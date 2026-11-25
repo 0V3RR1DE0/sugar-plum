@@ -6,34 +6,34 @@ Name=7-Zip
 Actions=sevenzip;zip;targz;tar;sevenzippass;zippass;
 X-KDE-Submenu=7-Zip
 X-KDE-Priority=TopLevel
-Icon=package-x-generic
+Icon=sugar-archive
 
 [Desktop Action sevenzip]
-Name=7z
+Name=Add to archive (7z)
 Icon=application-x-7z-compressed
 Exec=@BIN@ 7z %F
 
 [Desktop Action zip]
-Name=ZIP
-Icon=application-zip
+Name=Add to archive (ZIP)
+Icon=sugar-archive
 Exec=@BIN@ zip %F
 
 [Desktop Action targz]
-Name=tar.gz
+Name=Add to archive (tar.gz)
 Icon=application-x-compressed-tar
 Exec=@BIN@ targz %F
 
 [Desktop Action tar]
-Name=tar
+Name=Add to archive (tar)
 Icon=application-x-tar
 Exec=@BIN@ tar %F
 
 [Desktop Action sevenzippass]
-Name=7z with password…
+Name=Add to archive (7z, password)…
 Icon=application-x-7z-compressed
 Exec=@BIN@ 7zpass %F
 
 [Desktop Action zippass]
-Name=ZIP with password…
-Icon=application-zip
+Name=Add to archive (ZIP, password)…
+Icon=sugar-archive
 Exec=@BIN@ zippass %F

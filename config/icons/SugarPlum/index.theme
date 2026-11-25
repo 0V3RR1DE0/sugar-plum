@@ -1,7 +1,7 @@
 [Icon Theme]
 Name=Sugar Plum
-Comment=Pastel overrides over Papirus-Dark
-Inherits=Papirus-Dark,hicolor
+Comment=Pastel overrides over Mignon and Papirus-Dark
+Inherits=Mignon-pastel-dark,Papirus-Dark,hicolor
 Directories=scalable/apps,scalable/emblems
 
 [scalable/apps]

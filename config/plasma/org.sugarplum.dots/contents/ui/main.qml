@@ -1,10 +1,10 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.core as PlasmaCore
+import org.kde.pipewire 1.0 as PipeWire
 import org.kde.taskmanager as TaskManager
 
 PlasmoidItem {
@@ -44,20 +44,36 @@ PlasmoidItem {
                     launcherList: root.pinned
                 }
 
-                delegate: Item {
+                delegate: PlasmaCore.ToolTipArea {
                     id: taskItem
                     width: 36
                     height: 36
+                    active: taskItem.open
+                    interactive: true
+                    location: Plasmoid.location
+                    timeout: -1
+                    hideOnClick: true
+
                     property int taskIndex: index
-                    property bool active: model.IsActive ? true : false
+                    property bool taskActive: model.IsActive ? true : false
+                    property bool tooltipOpen: false
+                    onToolTipVisibleChanged: (visible) => { taskItem.tooltipOpen = visible }
                     property bool minimized: model.IsMinimized ? true : false
                     property bool launcher: model.IsLauncher ? true : false
                     property bool open: model.IsWindow ? true : (model.IsGroupParent ? true : ((model.ChildCount || 0) > 0))
                     property string label: model.display || ""
                     property var appIcon: model.decoration
+                    property var winIdList: model.WinIdList
                     property int childCount: model.ChildCount || 0
+
                     function childIndex(row) {
                         return tasksModel.makeModelIndex(taskItem.taskIndex, row)
+                    }
+
+                    function windowIndex(row) {
+                        return taskItem.childCount > 0
+                            ? tasksModel.makeModelIndex(taskItem.taskIndex, row)
+                            : tasksModel.makeModelIndex(taskItem.taskIndex)
                     }
 
                     function activeChild() {
@@ -69,13 +85,118 @@ PlasmoidItem {
                         return -1
                     }
 
+                    function mostRecentChild() {
+                        var best = -1
+                        var bestStack = -1
+                        for (var i = 0; i < taskItem.childCount; ++i) {
+                            var stack = tasksModel.data(taskItem.childIndex(i), TaskManager.TasksModel.StackingOrder)
+                            if (stack > bestStack) {
+                                bestStack = stack
+                                best = i
+                            }
+                        }
+                        return best
+                    }
+
+                    mainItem: Column {
+                        width: 420
+                        spacing: 2
+
+                        Repeater {
+                            model: taskItem.childCount > 0 ? taskItem.childCount : 1
+
+                            delegate: Item {
+                                id: windowRow
+                                width: 420
+                                height: 80
+                                property var childIdx: taskItem.windowIndex(index)
+                                property string winUuid: taskItem.winIdList && taskItem.winIdList.length > index
+                                    ? String(taskItem.winIdList[index])
+                                    : (taskItem.winIdList && taskItem.winIdList.length ? String(taskItem.winIdList[0]) : "")
+                                property bool rowActive: tasksModel.data(childIdx, TaskManager.TasksModel.IsActive)
+                                property bool previewActive: taskItem.containsMouse || taskItem.tooltipOpen
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 5
+                                    color: windowRow.rowActive
+                                        ? Qt.rgba(1, 1, 1, 0.10)
+                                        : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+                                }
+
+                                Item {
+                                    id: thumb
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 4
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 128
+                                    height: 72
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: 4
+                                        color: "#11111b"
+                                        border.width: 1
+                                        border.color: "#313244"
+                                    }
+
+                                    TaskManager.ScreencastingRequest {
+                                        id: screencast
+                                        uuid: windowRow.previewActive ? windowRow.winUuid : ""
+                                    }
+
+                                    Loader {
+                                        id: thumbLoader
+                                        anchors.fill: parent
+                                        active: windowRow.previewActive && screencast.nodeId > 0
+                                        sourceComponent: Component {
+                                            PipeWire.PipeWireSourceItem {
+                                                nodeId: screencast.nodeId
+                                            }
+                                        }
+                                    }
+
+                                    Kirigami.Icon {
+                                        anchors.centerIn: parent
+                                        width: 40
+                                        height: 40
+                                        source: taskItem.appIcon
+                                        visible: screencast.nodeId === 0
+                                    }
+                                }
+
+                                Text {
+                                    anchors.left: thumb.right
+                                    anchors.leftMargin: 8
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: tasksModel.data(windowRow.childIdx, Qt.DisplayRole) || ""
+                                    color: Kirigami.Theme.textColor
+                                    elide: Text.ElideRight
+                                    font: Kirigami.Theme.defaultFont
+                                }
+
+                                MouseArea {
+                                    id: rowMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: {
+                                        tasksModel.requestActivate(windowRow.childIdx)
+                                        taskItem.hideImmediately()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Rectangle {
                         anchors.fill: parent
                         anchors.margins: 2
                         radius: 10
-                        color: taskItem.active
+                        color: taskItem.taskActive
                             ? Qt.rgba(1.0, 0.70, 0.85, 0.14)
-                            : (mouse.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+                            : (taskItem.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
                     }
 
                     Kirigami.Icon {
@@ -111,120 +232,32 @@ PlasmoidItem {
                         }
                     }
 
-                    MouseArea {
-                        id: mouse
-                        anchors.fill: parent
-                        hoverEnabled: true
+                    TapHandler {
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                        onClicked: function (event) {
+                        onTapped: (eventPoint, button) => {
                             var idx = tasksModel.index(taskItem.taskIndex, 0)
-                            if (event.button === Qt.MiddleButton) {
+                            if (button === Qt.MiddleButton) {
                                 tasksModel.requestClose(idx)
                             } else if (taskItem.launcher && !taskItem.open) {
                                 tasksModel.requestNewInstance(idx)
                             } else if (taskItem.childCount > 1) {
-                                var next = (taskItem.activeChild() + 1) % taskItem.childCount
-                                tasksModel.requestActivate(taskItem.childIndex(next))
-                                preview.close()
-                            } else if (taskItem.active) {
+                                var current = taskItem.activeChild()
+                                var next = current === -1 ? taskItem.mostRecentChild() : (current + 1) % taskItem.childCount
+                                if (next < 0) next = 0
+                                var nextIdx = taskItem.childIndex(next)
+                                if (tasksModel.data(nextIdx, TaskManager.TasksModel.IsMinimized)) {
+                                    tasksModel.requestToggleMinimized(nextIdx)
+                                }
+                                tasksModel.requestActivate(nextIdx)
+                            } else if (taskItem.minimized) {
+                                tasksModel.requestToggleMinimized(idx)
+                                tasksModel.requestActivate(idx)
+                            } else if (taskItem.taskActive) {
                                 tasksModel.requestToggleMinimized(idx)
                             } else {
                                 tasksModel.requestActivate(idx)
                             }
                         }
-                        onContainsMouseChanged: {
-                            if (containsMouse && taskItem.childCount > 1) {
-                                previewTimer.restart()
-                            } else {
-                                previewTimer.stop()
-                            }
-                        }
-                    }
-
-                    Timer {
-                        id: previewTimer
-                        interval: 350
-                        repeat: false
-                        onTriggered: {
-                            if (mouse.containsMouse && taskItem.childCount > 1) {
-                                preview.show()
-                            }
-                        }
-                    }
-
-                    PlasmaCore.Dialog {
-                        id: preview
-                        visualParent: taskItem
-                        location: PlasmaCore.Types.Floating
-                        hideOnWindowDeactivate: true
-                        width: 280
-                        height: previewColumn.implicitHeight + 12
-                        x: Math.max(0, Math.min(Screen.width - width, Math.round(taskItem.mapToGlobal(taskItem.width / 2, 0).x - width / 2)))
-                        y: Math.max(0, Math.round(taskItem.mapToGlobal(0, 0).y - height - 6))
-
-                        mainItem: Column {
-                            id: previewColumn
-                            width: 268
-                            spacing: 2
-
-                            Repeater {
-                                model: taskItem.childCount
-
-                                delegate: Item {
-                                    id: windowRow
-                                    width: 260
-                                    height: 30
-                                    property var childIdx: tasksModel.makeModelIndex(taskItem.taskIndex, index)
-                                    property bool rowActive: tasksModel.data(childIdx, TaskManager.TasksModel.IsActive)
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: 5
-                                        color: windowRow.rowActive
-                                            ? Qt.rgba(1, 1, 1, 0.10)
-                                            : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
-                                    }
-
-                                    Kirigami.Icon {
-                                        id: rowIcon
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 4
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 18
-                                        height: 18
-                                        source: taskItem.appIcon
-                                        smooth: true
-                                    }
-
-                                    Text {
-                                        anchors.left: rowIcon.right
-                                        anchors.leftMargin: 6
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 6
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: tasksModel.data(windowRow.childIdx, Qt.DisplayRole) || ""
-                                        color: Kirigami.Theme.textColor
-                                        elide: Text.ElideRight
-                                        font: Kirigami.Theme.defaultFont
-                                    }
-
-                                    MouseArea {
-                                        id: rowMouse
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        onClicked: {
-                                            tasksModel.requestActivate(windowRow.childIdx)
-                                            preview.close()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    PlasmaComponents.ToolTip {
-                        text: taskItem.label
-                        visible: mouse.containsMouse && taskItem.childCount <= 1
                     }
                 }
             }
