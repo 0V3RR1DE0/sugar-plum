@@ -1,8 +1,10 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents
+import org.kde.plasma.core as PlasmaCore
 import org.kde.taskmanager as TaskManager
 
 PlasmoidItem {
@@ -52,6 +54,20 @@ PlasmoidItem {
                     property bool launcher: model.IsLauncher ? true : false
                     property bool open: model.IsWindow ? true : (model.IsGroupParent ? true : ((model.ChildCount || 0) > 0))
                     property string label: model.display || ""
+                    property var appIcon: model.decoration
+                    property int childCount: model.ChildCount || 0
+                    function childIndex(row) {
+                        return tasksModel.makeModelIndex(taskItem.taskIndex, row)
+                    }
+
+                    function activeChild() {
+                        for (var i = 0; i < taskItem.childCount; ++i) {
+                            if (tasksModel.data(taskItem.childIndex(i), TaskManager.TasksModel.IsActive)) {
+                                return i
+                            }
+                        }
+                        return -1
+                    }
 
                     Rectangle {
                         anchors.fill: parent
@@ -95,29 +111,120 @@ PlasmoidItem {
                         }
                     }
 
-
                     MouseArea {
                         id: mouse
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
                         onClicked: function (event) {
-                            var idx = tasksModel.index(taskItem.taskIndex, 0);
+                            var idx = tasksModel.index(taskItem.taskIndex, 0)
                             if (event.button === Qt.MiddleButton) {
-                                tasksModel.requestClose(idx);
-                            } else if (taskItem.active) {
-                                tasksModel.requestToggleMinimized(idx);
+                                tasksModel.requestClose(idx)
                             } else if (taskItem.launcher && !taskItem.open) {
-                                tasksModel.requestNewInstance(idx);
+                                tasksModel.requestNewInstance(idx)
+                            } else if (taskItem.childCount > 1) {
+                                var next = (taskItem.activeChild() + 1) % taskItem.childCount
+                                tasksModel.requestActivate(taskItem.childIndex(next))
+                                preview.close()
+                            } else if (taskItem.active) {
+                                tasksModel.requestToggleMinimized(idx)
                             } else {
-                                tasksModel.requestActivate(idx);
+                                tasksModel.requestActivate(idx)
+                            }
+                        }
+                        onContainsMouseChanged: {
+                            if (containsMouse && taskItem.childCount > 1) {
+                                previewTimer.restart()
+                            } else {
+                                previewTimer.stop()
+                            }
+                        }
+                    }
+
+                    Timer {
+                        id: previewTimer
+                        interval: 350
+                        repeat: false
+                        onTriggered: {
+                            if (mouse.containsMouse && taskItem.childCount > 1) {
+                                preview.show()
+                            }
+                        }
+                    }
+
+                    PlasmaCore.Dialog {
+                        id: preview
+                        visualParent: taskItem
+                        location: PlasmaCore.Types.Floating
+                        hideOnWindowDeactivate: true
+                        width: 280
+                        height: previewColumn.implicitHeight + 12
+                        x: Math.max(0, Math.min(Screen.width - width, Math.round(taskItem.mapToGlobal(taskItem.width / 2, 0).x - width / 2)))
+                        y: Math.max(0, Math.round(taskItem.mapToGlobal(0, 0).y - height - 6))
+
+                        mainItem: Column {
+                            id: previewColumn
+                            width: 268
+                            spacing: 2
+
+                            Repeater {
+                                model: taskItem.childCount
+
+                                delegate: Item {
+                                    id: windowRow
+                                    width: 260
+                                    height: 30
+                                    property var childIdx: tasksModel.makeModelIndex(taskItem.taskIndex, index)
+                                    property bool rowActive: tasksModel.data(childIdx, TaskManager.TasksModel.IsActive)
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: 5
+                                        color: windowRow.rowActive
+                                            ? Qt.rgba(1, 1, 1, 0.10)
+                                            : (rowMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+                                    }
+
+                                    Kirigami.Icon {
+                                        id: rowIcon
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 4
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 18
+                                        height: 18
+                                        source: taskItem.appIcon
+                                        smooth: true
+                                    }
+
+                                    Text {
+                                        anchors.left: rowIcon.right
+                                        anchors.leftMargin: 6
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: tasksModel.data(windowRow.childIdx, Qt.DisplayRole) || ""
+                                        color: Kirigami.Theme.textColor
+                                        elide: Text.ElideRight
+                                        font: Kirigami.Theme.defaultFont
+                                    }
+
+                                    MouseArea {
+                                        id: rowMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        onClicked: {
+                                            tasksModel.requestActivate(windowRow.childIdx)
+                                            preview.close()
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
 
                     PlasmaComponents.ToolTip {
                         text: taskItem.label
-                        visible: mouse.containsMouse
+                        visible: mouse.containsMouse && taskItem.childCount <= 1
                     }
                 }
             }

@@ -223,7 +223,7 @@ apply_kde() {
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme org.sugarplum.decoration
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.kwin.aurorae
   local e
-  for e in blur glide magiclamp wobblywindows slidingpopups; do
+  for e in blur glide magiclamp slidingpopups; do
     kwriteconfig6 --file kwinrc --group Plugins --key "${e}Enabled" true
   done
   kwriteconfig6 --file kwinrc --group Effect-blur --key blurStrength 7
@@ -496,7 +496,7 @@ PY
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key BorderSizeAuto true
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnLeft ""
   kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight IAX
-  for e in blur glide magiclamp wobblywindows slidingpopups; do
+  for e in blur glide magiclamp slidingpopups; do
     kwriteconfig6 --file kwinrc --group Plugins --key "${e}Enabled" false
   done
   have kbuildsycoca6 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true

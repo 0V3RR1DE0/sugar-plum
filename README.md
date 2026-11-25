@@ -7,14 +7,15 @@ that was already in the user's Nushell prompt.
 
 - **Plasma:** Catppuccin Mocha structure, a Sugar Plum colour scheme, Nunito 10,
   Papirus-Dark with candy folders, a full-width translucent taskbar, blur,
-  Glide, Magic Lamp and Wobbly Windows.
+  Glide and Magic Lamp.
 - **Window decoration:** a small QML decoration (`org.sugarplum.decoration`)
   with three inert pastel dots on the left and Breeze-style Minimize →
   Maximize → Close buttons on the right. KDE-decorated windows only; apps with
   client-side titlebars keep their own.
 - **Taskbar (`org.sugarplum.dots`):** real app icons; a three-dot badge at the
-  top-right of an app's icon when it is open; stable manual order; middle-click
-  closes; scroll/click activates. The pinned list lives in
+  top-right of an app's icon when it is open; stable manual order; clicking a
+  grouped app cycles its windows; hovering shows a clickable window list;
+  middle-click closes. The pinned list lives in
   `config/plasma/org.sugarplum.dots/contents/ui/main.qml`.
 - **Shells and CLI:** Ghostty frosted glass + Sugar Plum ANSI palette, Nushell
   env accents, fish `conf.d`, btop, bat, fzf, eza, fastfetch, LazyVim Catppuccin.
