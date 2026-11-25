@@ -2,8 +2,9 @@
 Type=Service
 ServiceTypes=KonqPopupMenu/Plugin
 MimeType=all/allfiles;inode/directory;
-Actions=sevenzip;zip;targz;tar;rar;sevenzippass;zippass;rarpass;
-X-KDE-Submenu=Compress with…
+Name=7-Zip
+Actions=sevenzip;zip;targz;tar;sevenzippass;zippass;
+X-KDE-Submenu=7-Zip
 X-KDE-Priority=TopLevel
 Icon=package-x-generic
 
@@ -27,11 +28,6 @@ Name=tar
 Icon=application-x-tar
 Exec=@BIN@ tar %F
 
-[Desktop Action rar]
-Name=RAR (needs rar)
-Icon=application-x-rar
-Exec=@BIN@ rar %F
-
 [Desktop Action sevenzippass]
 Name=7z with password…
 Icon=application-x-7z-compressed
@@ -41,8 +37,3 @@ Exec=@BIN@ 7zpass %F
 Name=ZIP with password…
 Icon=application-zip
 Exec=@BIN@ zippass %F
-
-[Desktop Action rarpass]
-Name=RAR with password… (needs rar)
-Icon=application-x-rar
-Exec=@BIN@ rarpass %F

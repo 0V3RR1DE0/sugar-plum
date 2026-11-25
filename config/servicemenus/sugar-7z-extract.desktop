@@ -2,7 +2,9 @@
 Type=Service
 ServiceTypes=KonqPopupMenu/Plugin
 MimeType=application/x-7z-compressed;application/zip;application/x-rar;application/x-rar-compressed;application/vnd.rar;application/x-tar;application/x-compressed-tar;application/gzip;application/x-gzip;application/x-bzip2;application/x-xz;application/zstd;application/x-lz4;application/x-lzip;application/x-lzma;application/x-archive;
+Name=7-Zip
 Actions=extracthere;extractto;extractpass;
+X-KDE-Submenu=7-Zip
 X-KDE-Priority=TopLevel
 Icon=archive-extract
 

@@ -274,6 +274,9 @@ apply_scripts() {
   link_file "$REPO/bin/screenshot" "$HOME/.local/bin/sugar-screenshot"
 
   mkdir -p "$HOME/.local/share/kio/servicemenus" "$HOME/.local/share/applications"
+  # Retire the old pre-repo 7-Zip menu; it duplicated the Sugar Plum actions.
+  local stale="$HOME/.local/share/kio/servicemenus/7z-extract.desktop"
+  [ -f "$stale" ] && mv -f -- "$stale" "$stale.disabled"
   local f dest
   for f in "$REPO"/config/servicemenus/*.desktop; do
     dest="$HOME/.local/share/kio/servicemenus/$(basename "$f")"

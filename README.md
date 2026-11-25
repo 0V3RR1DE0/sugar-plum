@@ -83,8 +83,8 @@ pkexec ~/sugar-plum/system/install-system.sh revert
   `./install.sh --revert` to return to stock Breeze.
 - The desktop shortcut arrows are drawn by Plasma's Folder View; the icon files
   are translucent but that overlay is not part of the icon theme.
-- RAR creation needs the proprietary `rar` package; extraction works with
-  `unrar`.
+- RAR creation is not offered (it needs the proprietary `rar` package);
+  extraction works with `unrar` and falls back to 7z.
 - The 7z quick actions open a Ghostty window for the live log and close on
   success; errors hold the window open.
 - If a Plasma update changes the task-manager QML API, the Sugar Dots applet may

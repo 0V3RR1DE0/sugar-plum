@@ -74,9 +74,9 @@ compress() {
   dir="$(dirname -- "$first")"
   base="$(basename -- "$first")"
   if [ "${#src[@]}" -eq 1 ] && [ ! -d "$first" ]; then
-    base="${base%.*}"
+    base="$(strip_archive_ext "$base")"
   elif [ "${#src[@]}" -gt 1 ]; then
-    base="$(basename -- "$PWD")"
+    base="$(basename -- "$dir")"
     [ "$base" = "/" ] && base="Archive"
   fi
   [ -n "$base" ] || base="Archive"
@@ -86,7 +86,6 @@ compress() {
     zip) ext="zip" ;;
     targz) ext="tar.gz" ;;
     tar) ext="tar" ;;
-    rar) ext="rar"; have rar || fail "Creating RAR needs the proprietary 'rar' package; extraction already works through unrar." ;;
   esac
 
   if [ "$want_pass" = "1" ]; then
@@ -116,11 +115,6 @@ compress() {
         ;;
       targz) tar -czvf "$out" -- "${names[@]}" ;;
       tar)   tar -cvf  "$out" -- "${names[@]}" ;;
-      rar)
-        local -a args=(a -m5)
-        [ -n "$pass" ] && args+=(-p"$pass")
-        rar "${args[@]}" "$out" "${names[@]}"
-        ;;
     esac
   ) || fail "Compression failed."
 
@@ -184,10 +178,8 @@ case "$mode" in
   zip)       compress zip 0 "$@" ;;
   targz)     compress targz 0 "$@" ;;
   tar)       compress tar 0 "$@" ;;
-  rar)       compress rar 0 "$@" ;;
   7zpass)    compress 7z 1 "$@" ;;
   zippass)   compress zip 1 "$@" ;;
-  rarpass)   compress rar 1 "$@" ;;
   extracthere) extract here 0 "$@" ;;
   extractto)   extract to 0 "$@" ;;
   extractpass) extract here 1 "$@" ;;
