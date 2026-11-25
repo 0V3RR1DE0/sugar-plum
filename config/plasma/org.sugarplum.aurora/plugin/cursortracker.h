@@ -35,6 +35,7 @@ protected:
 
 private:
     void attachWindow(QQuickWindow *window);
+    void updatePosition(const QPointF &scenePos);
 
     QPointF m_position{0.5, 0.5};
     bool m_tracking = true;

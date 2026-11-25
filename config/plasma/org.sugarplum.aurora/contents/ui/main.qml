@@ -253,14 +253,24 @@ WallpaperItem {
                 var step = Math.max(12, w / 90)
                 for (var x = 0; x <= w + 1; x += step) {
                     var u = x / w
-                    var y = (band.y
+                    var base = band.y
                         + Math.sin(u * 6.2 + phase * band.sp + band.off) * band.amp
                         + Math.sin(u * 13.0 - phase * band.sp * 0.7 + band.off) * band.amp * 0.24
-                        + my * 0.055) * h
+                    // Local pointer influence: the ribbon bends toward the pointer
+                    // and compresses horizontally near it, instead of the whole
+                    // band sliding up and down.
+                    var px = mx + 0.5
+                    var py = my + 0.5
+                    var dx = u - px
+                    var influence = Math.exp(-(dx * dx) / 0.020)
+                    var warp = (py - base) * 0.22 * influence
+                    var ripple = Math.sin((u - px) * 34 + phase * 1.2) * 0.006 * influence
+                    var drawX = x + dx * 0.045 * influence * w
+                    var y = (base + warp + ripple) * h
                     if (x === 0) {
-                        ctx.moveTo(x, y)
+                        ctx.moveTo(drawX, y)
                     } else {
-                        ctx.lineTo(x, y)
+                        ctx.lineTo(drawX, y)
                     }
                 }
                 ctx.stroke()
@@ -268,6 +278,9 @@ WallpaperItem {
         }
 
         ctx.globalAlpha = 1
+        glow(ctx, (mx + 0.5) * w, (my + 0.5) * h,
+             Math.min(w, h) * 0.24, [255, 179, 217], 0.10 * intensity)
+
         ctx.globalCompositeOperation = "source-over"
         if (showStars) {
             drawStars(ctx, w, h, silkStars, 0.26, true)

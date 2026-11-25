@@ -1,6 +1,7 @@
 #include "cursortracker.h"
 
 #include <QEvent>
+#include <QHoverEvent>
 #include <QMouseEvent>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -54,23 +55,33 @@ void CursorTracker::attachWindow(QQuickWindow *window)
     }
 }
 
-bool CursorTracker::eventFilter(QObject *watched, QEvent *event)
+void CursorTracker::updatePosition(const QPointF &scenePos)
 {
-    Q_UNUSED(watched)
-    if (event->type() != QEvent::MouseMove || !m_tracking || !m_item) {
-        return false;
+    if (!m_item || m_item->width() <= 0 || m_item->height() <= 0) {
+        return;
     }
 
-    auto *mouse = static_cast<QMouseEvent *>(event);
-    if (m_item->width() <= 0 || m_item->height() <= 0) {
-        return false;
-    }
-
-    const QPointF local = m_item->mapFromScene(mouse->position());
+    const QPointF local = m_item->mapFromScene(scenePos);
     const QPointF normalized(local.x() / m_item->width(), local.y() / m_item->height());
     if (normalized != m_position) {
         m_position = normalized;
         Q_EMIT positionChanged();
+    }
+}
+
+bool CursorTracker::eventFilter(QObject *watched, QEvent *event)
+{
+    Q_UNUSED(watched)
+    if (!m_tracking || !m_item) {
+        return false;
+    }
+
+    // The desktop containment receives hover moves, not mouse moves, unless a
+    // button is held. Handle both so the wallpaper follows the pointer.
+    if (event->type() == QEvent::MouseMove) {
+        updatePosition(static_cast<QMouseEvent *>(event)->position());
+    } else if (event->type() == QEvent::HoverMove || event->type() == QEvent::HoverEnter) {
+        updatePosition(static_cast<QHoverEvent *>(event)->position());
     }
     return false;
 }
