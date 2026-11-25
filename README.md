@@ -39,8 +39,10 @@ cd ~/sugar-plum
 ```
 
 Everything is user-level. It downloads Papirus, satty and the Catppuccin KDE
-theme; no pacman packages are required. On a fresh machine, the first run stores
-the originals under `backups/originals/`, then applies the rice.
+theme. The Aurora cursor helper and the 7-Zip GUI need `cmake`, `g++`, Qt6
+development headers and PySide6 (all present here); on a fresh machine those are
+the only extra build dependencies. The first run stores the originals under
+`backups/originals/`, then applies the rice.
 
 ```sh
 ./install.sh --status     # what is present
@@ -86,10 +88,10 @@ pkexec ~/sugar-plum/system/install-system.sh revert
 - Desktop icons are faded to 60% by `bin/desktop-icons`; shortcut arrows are
   hidden with a transparent theme emblem. If arrows return after an icon-theme
   change, rerun `./bin/desktop-icons apply`.
-- RAR creation is not offered (it needs the proprietary `rar` package);
-  extraction works with `unrar` and falls back to 7z.
+- RAR creation is available in the Add to archive GUI only when the proprietary
+  `rar` package is installed; extraction works with `unrar` and falls back to 7z.
 - The 7z quick actions open a Ghostty window for the live log and close on
-  success; errors hold the window open.
+  success; errors hold the window open. The GUI opens a styled PySide6 dialog.
 - If a Plasma update changes the task-manager QML API, the Sugar Dots applet may
   need a fix; `./install.sh --revert` returns to the stock taskbar.
 - Papirus-Dark's large sizes are shared with the `Papirus` base tree; the
