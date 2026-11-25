@@ -105,6 +105,36 @@ Catppuccin KDE, Papirus, Mignon folder icons, Satty, KDE Plasma, Nushell/fish.
 
 ## License
 
-MIT for the scripts and configuration. Fonts: SIL OFL (Nunito). Wallpapers:
-Catppuccin and Papirus retain
-their own licenses. The vendored Mignon folder SVGs are GPL-3.0.
+MIT for the original scripts, QML and configuration. Bundled third-party
+assets keep their own licenses — see `THIRD-PARTY.md`. Fonts are SIL OFL
+(Nunito); Catppuccin and Papirus are downloaded by the installer and retain
+their upstream licenses.
+
+## Sharing
+
+The repo has no remote configured. To publish it on GitHub (the `gh` CLI is
+already authenticated on this machine):
+
+```sh
+cd ~/sugar-plum
+gh repo create sugar-plum --public --source=. --remote=origin --push
+```
+
+For a private repo use `--private`. Or add any Git remote manually:
+
+```sh
+git remote add origin <remote-url>
+git branch -M main
+git push -u origin main
+```
+
+To hand someone a single file, create a Git bundle:
+
+```sh
+git bundle create ~/sugar-plum.bundle --all
+# recipient:
+git clone ~/sugar-plum.bundle sugar-plum
+```
+
+Never commit `backups/` or `state/`; they are deliberately ignored because they
+contain machine-specific originals and install state.
