@@ -6,7 +6,7 @@ The original scripts, QML and configuration in this repository are MIT-licensed
 | Asset | License | License file |
 | --- | --- | --- |
 | Mignon icon theme folder SVGs (`config/icons/SugarPlum/scalable/places`) | GPL-3.0 | `assets/licenses/Mignon-GPL-3.0.txt` |
-| Papirus candy folder assets (`assets/papirus-pink`) | GPL-2.0 | `assets/papirus-pink/LICENSE` |
+| Papirus candy folder assets (`assets/papirus-pink`) | GPL-3.0 | `assets/licenses/Papirus-GPL-3.0.txt` |
 | Catppuccin Mocha Pink cursors (`assets/cursors/catppuccin-mocha-pink-cursors`) | GPL-2.0 | `assets/cursors/catppuccin-mocha-pink-cursors/LICENSE` |
 | Nunito fonts (`assets/fonts`) | SIL OFL 1.1 | `assets/fonts/OFL.txt` |
 

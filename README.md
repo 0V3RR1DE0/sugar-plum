@@ -20,8 +20,8 @@ that was already in the user's Nushell prompt.
   the taskbar. The pinned list persists in the applet configuration.
 - **Shells and CLI:** Ghostty frosted glass + Sugar Plum ANSI palette, Nushell
   env accents, fish `conf.d`, btop, bat, fzf, eza, fastfetch, LazyVim Catppuccin.
-- **Apps:** GTK gets Breeze-Dark + Papirus + Nunito; Dolphin gets one 7-Zip service
-  menu and Mignon pastel folder icons.
+- **Apps:** GTK gets Breeze-Dark + Sugar Plum icons + Papirus fallback + Nunito;
+  Dolphin gets a 7-Zip submenu and Mignon pastel folder icons.
 - **Screenshots:** `Print` region, `Shift+Print` full screen, `Alt+Print` active
   window → satty → clipboard + `~/Pictures/Screenshots`.
 - **Wallpaper:** Sugar Plum Aurora, an animated dark-pastel blob/star wallpaper
@@ -33,7 +33,7 @@ that was already in the user's Nushell prompt.
 ## Install
 
 ```sh
-git clone <your-remote> ~/sugar-plum   # or copy this folder
+git clone https://github.com/0V3RR1DE0/sugar-plum.git ~/sugar-plum   # or copy this folder
 cd ~/sugar-plum
 ./install.sh
 ```
@@ -44,11 +44,15 @@ development headers and PySide6 (all present here); on a fresh machine those are
 the only extra build dependencies. The first run stores the originals under
 `backups/originals/`, then applies the rice.
 
+Runtime deps for the helper actions: `spectacle`, `satty` (installed by this
+script), `wl-clipboard`, `7z`, `unrar`, `zenity`, ImageMagick (`magick` or
+`convert`) and Ghostty/Konsole/xterm. `rar` is optional, only for RAR creation.
+
 ```sh
 ./install.sh --status     # what is present
 ./install.sh --dry-run    # what apply would do
 ./install.sh --update     # git pull (if a remote exists) + re-apply
-./install.sh --revert     # restore originals and switch back to Breeze
+./install.sh --revert     # restore your pre-rice files
 ```
 
 ### Login + Limine (optional, one admin step)
@@ -77,7 +81,9 @@ pkexec ~/sugar-plum/system/install-system.sh revert
 ## Known limits
 
 - The screenshot shortcuts become active after a logout/login (KGlobalAccel
-  reads `[services]` at session start).
+  reads `[services]` at session start). `Meta+Shift+Print` is the native
+  Spectacle region fallback; the rice's bindings are Print / Shift+Print /
+  Alt+Print.
 - Plasma Login Manager 6.8 only exposes a wallpaper; the greeter remains Breeze.
 - Limine is text-based; the theme is wallpaper + terminal palette + branding.
 - Third-party KWin effects are deliberately avoided (NVIDIA Wayland stability).
@@ -112,29 +118,33 @@ their upstream licenses.
 
 ## Sharing
 
-The repo has no remote configured. To publish it on GitHub (the `gh` CLI is
-already authenticated on this machine):
+Published at <https://github.com/0V3RR1DE0/sugar-plum>.
+
+On another machine:
 
 ```sh
+git clone https://github.com/0V3RR1DE0/sugar-plum.git ~/sugar-plum
 cd ~/sugar-plum
-gh repo create sugar-plum --public --source=. --remote=origin --push
+./install.sh
 ```
 
-For a private repo use `--private`. Or add any Git remote manually:
+`backups/` and `state/` are machine-specific and deliberately ignored; the
+installer creates fresh ones on each machine. To update:
 
 ```sh
-git remote add origin <remote-url>
-git branch -M main
-git push -u origin main
+cd ~/sugar-plum && ./install.sh --update
 ```
 
-To hand someone a single file, create a Git bundle:
+For an offline copy, create a Git bundle:
 
 ```sh
 git bundle create ~/sugar-plum.bundle --all
 # recipient:
 git clone ~/sugar-plum.bundle sugar-plum
 ```
+
+The optional system half (`./install.sh --system apply`) is per machine. On a
+non-CachyOS install the CachyOS wallpaper paths are skipped with a warning.
 
 Never commit `backups/` or `state/`; they are deliberately ignored because they
 contain machine-specific originals and install state.
