@@ -10,7 +10,20 @@ MARK="$REPO/state/system-applied"
 MODE="${1:-apply}"
 
 [ "$(id -u)" -eq 0 ] || { echo "run this with sudo (or ./install.sh --system)" >&2; exit 1; }
+case "$ESP" in
+  /*) ;;
+  *) echo "refusing invalid ESP_PATH: $ESP" >&2; exit 1 ;;
+esac
+[ "$ESP" != "/" ] || { echo "refusing ESP_PATH=/" >&2; exit 1; }
+[ -d "$ESP" ] || { echo "ESP_PATH is not a directory: $ESP" >&2; exit 1; }
 mkdir -p "$BACKUPS"
+# A group/world-writable repo lets another local user inject root code.
+if [ $((0$(stat -c %a "$REPO") & 0022)) -ne 0 ]; then
+  echo "refusing: repo is group/world-writable: $REPO" >&2; exit 1
+fi
+if [ $((0$(stat -c %a "$BACKUPS") & 0022)) -ne 0 ]; then
+  echo "refusing: backup dir is group/world-writable: $BACKUPS" >&2; exit 1
+fi
 say()  { printf '\033[38;5;218m▸\033[0m %s\n' "$*"; }
 ok()   { printf '\033[38;5;150m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[38;5;222m!\033[0m %s\n' "$*" >&2; }
@@ -24,30 +37,16 @@ backup_once() {
 }
 
 rewrite_plasmalogin() {
-  python3 - "$1" <<'PY'
-import sys, pathlib
-p = pathlib.Path(sys.argv[1])
-text = p.read_text() if p.exists() else ""
-header = "[Greeter][Wallpaper][org.kde.image][General]"
-lines = text.splitlines()
-out, skip = [], False
-for line in lines:
-    if line.strip() == header:
-        skip = True
-        continue
-    if skip and line.lstrip().startswith("["):
-        skip = False
-    if not skip:
-        out.append(line)
-while out and not out[-1].strip():
-    out.pop()
-out += ["", header, "Image=file:///var/lib/plasmalogin/wallpapers/sugar-plum.jpg", ""]
-p.write_text("\n".join(out))
-PY
+  # Set only Image=; preserve autologin and any other greeter keys.
+  kwriteconfig6 --file "$1" \
+    --group Greeter --group Wallpaper --group org.kde.image --group General \
+    --key Image "file:///var/lib/plasmalogin/wallpapers/sugar-plum.jpg"
 }
 
 apply_login() {
   [ -f /etc/plasmalogin.conf ] || { warn "PLM config not found; skipping login wallpaper"; return; }
+  [ -f /usr/share/wallpapers/cachyos-wallpapers/north.png ] \
+    || { warn "CachyOS login wallpaper missing; skipping"; return; }
   backup_once /etc/plasmalogin.conf plasmalogin.conf
   install -d -m 755 /var/lib/plasmalogin/wallpapers
   install -m 644 /usr/share/wallpapers/cachyos-wallpapers/north.png /var/lib/plasmalogin/wallpapers/sugar-plum.jpg
@@ -57,7 +56,12 @@ apply_login() {
 
 apply_limine() {
   [ -f "$ESP/limine.conf" ] || { warn "no $ESP/limine.conf; skipping Limine"; return; }
+  [ ! -L "$ESP/limine.conf" ] || { warn "$ESP/limine.conf is a symlink; skipping"; return; }
   command -v limine >/dev/null 2>&1 || { warn "limine binary not found; skipping"; return; }
+  [ -f /usr/share/wallpapers/cachyos-wallpapers/CachyOS_Moon.jpg ] \
+    || { warn "CachyOS Limine wallpaper missing; skipping"; return; }
+  [ -f "$REPO/system/limine-theme.conf" ] \
+    || { warn "limine-theme.conf missing; skipping"; return; }
   backup_once "$ESP/limine.conf" limine.conf
   install -d -m 755 "$ESP/sugar-plum"
   install -m 644 /usr/share/wallpapers/cachyos-wallpapers/CachyOS_Moon.jpg "$ESP/sugar-plum/limine.jpg"
@@ -69,19 +73,39 @@ apply_limine() {
 }
 
 revert_login() {
-  [ -f "$BACKUPS/plasmalogin.conf" ] && cp -a "$BACKUPS/plasmalogin.conf" /etc/plasmalogin.conf
+  # Never restore the (possibly months-old) backup over the live file;
+  # remove only the wallpaper key this rice added.
+  if [ -f /etc/plasmalogin.conf ]; then
+    kwriteconfig6 --file /etc/plasmalogin.conf \
+      --group Greeter --group Wallpaper --group org.kde.image --group General \
+      --key Image --delete || warn "could not remove login wallpaper key"
+  fi
   rm -f /var/lib/plasmalogin/wallpapers/sugar-plum.jpg
-  ok "login restored"
+  ok "login wallpaper removed"
 }
 
 revert_limine() {
-  [ -f "$BACKUPS/limine.conf" ] && cp -a "$BACKUPS/limine.conf" "$ESP/limine.conf"
+  # Remove only this rice's block; restoring the raw backup after a kernel
+  # update would drop boot entries.
+  if [ -f "$ESP/limine.conf" ]; then
+    python3 - "$ESP/limine.conf" <<'PY'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+text = p.read_text()
+start, end = "# >>> sugar-plum >>>", "# <<< sugar-plum <<<"
+while start in text and end in text:
+    a = text.index(start)
+    b = text.index(end, a) + len(end)
+    text = text[:a] + text[b:]
+p.write_text(text.lstrip("\n"))
+PY
+  fi
   rm -f /etc/boot/hooks/post.d/80-sugar-plum-theme
   rm -rf "$ESP/sugar-plum"
   if grep -q '^ENABLE_ENROLL_LIMINE_CONFIG=yes' /etc/default/limine 2>/dev/null; then
     limine-enroll-config >/dev/null 2>&1 || true
   fi
-  ok "Limine restored"
+  ok "Limine theme block removed"
 }
 
 case "$MODE" in

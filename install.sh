@@ -10,9 +10,12 @@ ORIG="$STATE/originals.tsv"
 NEW="$STATE/new.tsv"
 BLOCKS="$STATE/blocks.tsv"
 CAT_CACHE="$HOME/.cache/sugar-plum/catppuccin-kde"
-PAP_CACHE="$HOME/.cache/sugar-plum/papirus"
+PAP_CACHE="$HOME/.local/share/sugar-plum/papirus"
 PAP_SCRIPT="$HOME/.local/bin/papirus-folders"
 SAT_URL="https://github.com/Satty-org/Satty/releases/download/v0.22.0/satty-x86_64-unknown-linux-gnu.tar.gz"
+SAT_SHA256="eb7a028c4a5ce331c2f355add8e2b807a7d697fe4495f7e1965786a4f6bcd5b8"
+PAP_SCRIPT_SHA256="b30a6848a00690302accffc050549218b0b114d3178b28bd3a16891817821b06"
+CAT_COMMIT="6606b5179cfc1e9ba5c3b6b70e15c468e2dddca2"
 LIBEXEC="$HOME/.local/share"
 
 mkdir -p "$STATE" "$ORIGINALS" "$HOME/.local/bin"
@@ -48,6 +51,10 @@ link_file() {
   local src="$1" dest="$2"
   backup_once "$dest"
   mkdir -p -- "$(dirname -- "$dest")"
+  # ln -sfn nests inside an existing real directory; replace it instead.
+  if [ -e "$dest" ] && [ ! -L "$dest" ]; then
+    rm -rf -- "$dest"
+  fi
   ln -sfn -- "$src" "$dest"
   track_new "$dest" symlink
 }
@@ -120,11 +127,19 @@ install_fonts() {
 
 install_satty() {
   local bin="$HOME/.local/bin/satty"
-  if [ -x "$bin" ]; then ok "satty already installed"; return; fi
+  if [ -x "$bin" ] && "$bin" --version 2>/dev/null | grep -q '0\.22\.0'; then
+    ok "satty already installed"
+    return
+  fi
   local tmp; tmp="$(mktemp -d)"
   say "downloading satty"
   curl -fsSL "$SAT_URL" -o "$tmp/satty.tar.gz" || die "satty download failed"
-  tar xzf "$tmp/satty.tar.gz" -C "$tmp"
+  printf '%s  %s\n' "$SAT_SHA256" "$tmp/satty.tar.gz" | sha256sum -c - >/dev/null \
+    || die "satty checksum mismatch"
+  if tar -tzf "$tmp/satty.tar.gz" | grep -qE '(^/|(^|/)\.\.(/|$))'; then
+    die "satty archive contains unsafe paths"
+  fi
+  tar xzf "$tmp/satty.tar.gz" -C "$tmp" --no-same-owner --no-same-permissions
   install -Dm755 "$tmp/satty" "$bin"
   track_new "$bin" file
   rm -rf "$tmp"
@@ -133,12 +148,18 @@ install_satty() {
 
 install_papirus() {
   local theme="$PAP_CACHE/Papirus-Dark"
+  if [ ! -d "$PAP_CACHE/.git" ] && [ -d "$HOME/.cache/sugar-plum/papirus/.git" ]; then
+    say "moving Papirus out of the cache"
+    mkdir -p "$(dirname "$PAP_CACHE")"
+    mv "$HOME/.cache/sugar-plum/papirus" "$PAP_CACHE"
+  fi
   if [ ! -d "$PAP_CACHE/.git" ]; then
     say "fetching Papirus-Dark"
     git clone --depth 1 --filter=blob:none --sparse -q https://github.com/PapirusDevelopmentTeam/papirus-icon-theme "$PAP_CACHE" || die "Papirus clone failed"
     git -C "$PAP_CACHE" sparse-checkout set Papirus-Dark Papirus/32x32 Papirus/48x48 Papirus/64x64
   fi
   [ -d "$theme" ] || die "Papirus-Dark checkout missing"
+  track_new "$PAP_CACHE" dir
 
   local pink="$theme/48x48/places/folder-cat-mocha-pink.svg"
   if [ ! -e "$pink" ]; then
@@ -149,14 +170,21 @@ install_papirus() {
     done
   fi
 
-  if [ ! -x "$PAP_SCRIPT" ]; then
-    curl -fsSL https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/master/papirus-folders -o "$PAP_SCRIPT" || die "papirus-folders download failed"
-    chmod +x "$PAP_SCRIPT"
+  if ! printf '%s  %s\n' "$PAP_SCRIPT_SHA256" "$PAP_SCRIPT" | sha256sum -c - >/dev/null 2>&1; then
+    local ptmp; ptmp="$(mktemp)"
+    curl -fsSL https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/master/papirus-folders -o "$ptmp" || die "papirus-folders download failed"
+    printf '%s  %s\n' "$PAP_SCRIPT_SHA256" "$ptmp" | sha256sum -c - >/dev/null \
+      || die "papirus-folders checksum mismatch"
+    install -Dm755 "$ptmp" "$PAP_SCRIPT"
+    rm -f "$ptmp"
     track_new "$PAP_SCRIPT" file
   fi
 
   backup_once "$HOME/.local/share/icons/Papirus-Dark"
   mkdir -p "$HOME/.local/share/icons"
+  if [ -e "$HOME/.local/share/icons/Papirus-Dark" ] && [ ! -L "$HOME/.local/share/icons/Papirus-Dark" ]; then
+    rm -rf "$HOME/.local/share/icons/Papirus-Dark"
+  fi
   ln -sfn "$theme" "$HOME/.local/share/icons/Papirus-Dark"
   track_new "$HOME/.local/share/icons/Papirus-Dark" symlink
   find "$PAP_CACHE" -name icon-theme.cache -delete 2>/dev/null || true
@@ -168,8 +196,13 @@ install_papirus() {
 install_catppuccin() {
   if [ ! -d "$CAT_CACHE/.git" ]; then
     say "fetching Catppuccin KDE"
-    git clone --depth 1 -q https://github.com/catppuccin/kde "$CAT_CACHE" || die "Catppuccin KDE clone failed"
+    mkdir -p "$CAT_CACHE"
+    git -C "$CAT_CACHE" init -q
+    git -C "$CAT_CACHE" remote get-url origin >/dev/null 2>&1 \
+      || git -C "$CAT_CACHE" remote add origin https://github.com/catppuccin/kde
   fi
+  git -C "$CAT_CACHE" fetch --depth 1 -q origin "$CAT_COMMIT" || die "Catppuccin KDE fetch failed"
+  git -C "$CAT_CACHE" checkout -q FETCH_HEAD || die "Catppuccin KDE checkout failed"
   backup_once "$HOME/.config/kwinrc"
   ( cd "$CAT_CACHE" && ./install.sh -q -n 1 3 2 auto ) || die "Catppuccin KDE installer failed"
   track_new "$HOME/.local/share/color-schemes/CatppuccinMochaPink.colors" file
@@ -181,10 +214,11 @@ install_catppuccin() {
 install_cursor() {
   local dest="$HOME/.local/share/icons/catppuccin-mocha-pink-cursors"
   backup_once "$HOME/.config/kcminputrc"
+  backup_once "$dest"
   if [ -e "$dest" ] && [ ! -L "$dest" ]; then rm -rf "$dest"; fi
   link_file "$REPO/assets/cursors/catppuccin-mocha-pink-cursors" "$dest"
   kwriteconfig6 --file kcminputrc --group Mouse --key cursorTheme catppuccin-mocha-pink-cursors
-  kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 20
+  kwriteconfig6 --file kcminputrc --group Mouse --key cursorSize 24
   command -v plasma-apply-cursortheme >/dev/null 2>&1 && plasma-apply-cursortheme catppuccin-mocha-pink-cursors >/dev/null 2>&1 || true
   ok "Catppuccin pink cursor"
 }
@@ -235,11 +269,9 @@ apply_kde() {
   plasma-apply-colorscheme SugarPlum >/dev/null 2>&1 || warn "could not apply Sugar Plum color scheme"
   qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
 
-  local g
-  for g in gtk-3.0 gtk-4.0; do
-    mkdir -p "$HOME/.config/$g"
-    copy_new "$REPO/config/gtk/settings.ini" "$HOME/.config/$g/settings.ini"
-  done
+  mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
+  copy_new "$REPO/config/gtk/settings.ini" "$HOME/.config/gtk-3.0/settings.ini"
+  copy_new "$REPO/config/gtk/settings-4.ini" "$HOME/.config/gtk-4.0/settings.ini"
   ok "KDE theme, fonts, window buttons, effects"
 }
 
@@ -296,28 +328,28 @@ apply_scripts() {
     track_new "$dest" file
   done
 
-  python3 - "$HOME/.config/kglobalshortcutsrc" <<'PY'
-import sys, configparser, pathlib
-p = pathlib.Path(sys.argv[1]); p.parent.mkdir(parents=True, exist_ok=True)
-c = configparser.RawConfigParser(strict=False); c.optionxform = str
-c.read(p)
-def sec(name):
-    if not c.has_section(name): c.add_section(name)
-    return name
-s = sec("services][org.kde.spectacle.desktop")
-for k in ("_launch","FullScreenScreenShot","RectangularRegionScreenShot","ActiveWindowScreenShot","CurrentMonitorScreenShot","WindowUnderCursorScreenShot"):
-    c.set(s, k, "none")
-for name, key, label in (
-    ("sugar-screenshot-region.desktop","Print","Sugar Screenshot (Region)"),
-    ("sugar-screenshot-full.desktop","Shift+Print","Sugar Screenshot (Full Screen)"),
-    ("sugar-screenshot-window.desktop","Alt+Print","Sugar Screenshot (Window)"),
-):
-    s = sec(f"services][{name}")
-    c.set(s, "_launch", f"{key},none,{label}")
-with p.open("w") as f: c.write(f, space_around_delimiters=False)
-PY
+  # Use KConfig instead of rewriting the whole file with configparser.
+  # Keep Spectacle's native region action as a fallback on a different chord.
+  kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key _launch none
+  kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "Meta+Shift+Print"
+  while IFS='|' read -r file key default label; do
+    kwriteconfig6 --file kglobalshortcutsrc --group services --group "$file" --key _launch "$key,$default,$label"
+  done <<'EOF'
+sugar-screenshot-region.desktop|Print|Print|Sugar Screenshot (Region)
+sugar-screenshot-full.desktop|Shift+Print|Shift+Print|Sugar Screenshot (Full Screen)
+sugar-screenshot-window.desktop|Alt+Print|Alt+Print|Sugar Screenshot (Window)
+EOF
   have kbuildsycoca6 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
-  ok "screenshot + 7z actions, shortcuts (active next login)"
+  # Best-effort live registration; a relogin still guarantees it.
+  if command -v gdbus >/dev/null 2>&1; then
+    gdbus call --session --dest org.kde.kglobalaccel --object-path /kglobalaccel \
+      --method org.kde.KGlobalAccel.setShortcut \
+      "['org.kde.spectacle.desktop', 'RectangularRegionScreenShot']" "[318767113]" 1 >/dev/null 2>&1 || true
+    gdbus call --session --dest org.kde.kglobalaccel --object-path /kglobalaccel \
+      --method org.kde.KGlobalAccel.setShortcut \
+      "['sugar-screenshot-region.desktop', '_launch']" "[16777225]" 1 >/dev/null 2>&1 || true
+  fi
+  ok "screenshot + 7z actions, shortcuts (relogin guarantees activation)"
 }
 
 apply_panel() {
@@ -363,11 +395,21 @@ if target is None:
             target = s; break
 if target is None:
     sys.exit(2)
+already_dots = c.get(target, "plugin") == "org.sugarplum.dots"
 c.set(target, "plugin", "org.sugarplum.dots")
 applet_id = target.rsplit("][", 1)[-1]
-for s in list(c.sections()):
-    if s.startswith(target + "][Configuration"):
-        c.remove_section(s)
+# Only clear the applet configuration when converting from icontasks.
+# Clearing it on every apply wipes the pinned Launchers list.
+if not already_dots:
+    for s in list(c.sections()):
+        if s.startswith(target + "][Configuration"):
+            c.remove_section(s)
+panel_section = panels[0] if panels else None
+parts = target.rsplit("][", 2)
+if len(parts) == 3:
+    candidate = parts[0] + "]"
+    if candidate in panels:
+        panel_section = candidate
 # remove extra dots applets (e.g. a test one), keep target
 for s in list(c.sections()):
     if c.has_option(s, "plugin") and c.get(s, "plugin") == "org.sugarplum.dots" and s != target:
@@ -376,13 +418,13 @@ for s in list(c.sections()):
         for t in list(c.sections()):
             if t.startswith(s + "]["):
                 c.remove_section(t)
-        if panels:
-            g = panels[0] + "][General"
+        if panel_section:
+            g = panel_section + "][General"
             if c.has_option(g, "AppletOrder"):
                 order = [x for x in c.get(g, "AppletOrder").split(";") if x != extra]
                 c.set(g, "AppletOrder", ";".join(order))
-if panels:
-    g = panels[0] + "][General"
+if panel_section:
+    g = panel_section + "][General"
     if not c.has_option(g, "AppletOrder"):
         c.set(g, "AppletOrder", applet_id)
     elif applet_id not in c.get(g, "AppletOrder").split(";"):
@@ -449,7 +491,10 @@ status() {
     "$HOME/.local/share/color-schemes/SugarPlum.colors" \
     "$HOME/.local/share/icons/Papirus-Dark" \
     "$HOME/.local/share/plasma/plasmoids/org.sugarplum.dots" \
-    "$HOME/.local/bin/sugar-7z" "$HOME/.local/bin/sugar-screenshot" \
+    "$HOME/.local/share/kwin/decorations/org.sugarplum.decoration" \
+    "$HOME/.local/bin/sugar-7z" "$HOME/.local/bin/sugar-7z-gui" "$HOME/.local/bin/sugar-screenshot" \
+    "$HOME/.local/share/icons/SugarPlum-Desktop" \
+    "$HOME/.config/plasma-workspace/env/sugar-plum-qml.sh" \
     "$HOME/.config/fish/conf.d/90-sugar-plum.fish" \
     "$HOME/.config/nushell/sugar-plum.nu" \
     "$HOME/.config/ghostty/sugar-plum.conf" \
@@ -457,19 +502,24 @@ status() {
     "$HOME/.config/nvim/lua/plugins/sugar-plum.lua" \
     "$HOME/.local/share/plasma/wallpapers/org.sugarplum.aurora" \
     "$HOME/.local/lib/qt6/qml/org/sugarplum/cursor"; do
-    [ -e "$p" ] || [ -L "$p" ] && printf '%-38s ok\n' "${p#$HOME/}" || printf '%-38s missing\n' "${p#$HOME/}"
+    # -e follows links, so a dangling symlink is reported missing.
+    [ -e "$p" ] && printf '%-38s ok\n' "${p#$HOME/}" || printf '%-38s missing\n' "${p#$HOME/}"
   done
   printf '%-38s %s\n' "color scheme" "$(kreadconfig6 --file kdeglobals --group General --key ColorScheme 2>/dev/null || true)"
   printf '%-38s %s\n' "icon theme" "$(kreadconfig6 --file kdeglobals --group Icons --key Theme 2>/dev/null || true)"
   printf '%-38s %s\n' "font" "$(kreadconfig6 --file kdeglobals --group General --key font 2>/dev/null || true)"
-  printf '%-38s %s\n' "wallpaper interval" "$(grep -m1 '^SlideInterval=' "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" 2>/dev/null | cut -d= -f2 || true)"
+  printf '%-38s %s\n' "bat theme" "$(bat --list-themes 2>/dev/null | grep -Fqx 'Sugar Plum' && echo ok || echo missing)"
+  printf '%-38s %s\n' "wallpaper plugins" "$(grep '^wallpaperplugin=' "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" 2>/dev/null | cut -d= -f2 | sort -u | tr '\n' ' ' || true)"
   printf '%-38s %s\n' "system step" "$([ -e "$REPO/state/system-applied" ] && echo applied || echo 'not applied (needs sudo)')"
 }
 
 revert_all() {
   "$REPO/bin/desktop-icons" revert 2>/dev/null || true
   say "reverting Sugar Plum (user level)"
-  local file
+  # Plasma holds appletsrc in memory and rewrites it on restart.
+  systemctl --user stop plasma-plasmashell >/dev/null 2>&1 || true
+  trap 'systemctl --user start plasma-plasmashell >/dev/null 2>&1 || true' EXIT
+  local file path kind how key real
   if [ -f "$BLOCKS" ]; then
     while IFS= read -r file; do
       [ -f "$file" ] || continue
@@ -487,47 +537,45 @@ PY
   if [ -f "$NEW" ]; then
     tac "$NEW" 2>/dev/null | while IFS=$'\t' read -r path kind; do
       [ -n "$path" ] || continue
-      case "$path" in "$HOME"/*) ;; *) warn "refusing to remove $path"; continue ;; esac
-      if [ "$kind" = "dir" ]; then rm -rf -- "$path"; else rm -f -- "$path"; fi
+      real="$(realpath -m -- "$path" 2>/dev/null || printf '%s' "$path")"
+      case "$real" in "$HOME"/*) ;; *) warn "refusing to remove $path"; continue ;; esac
+      # A stale record must never turn into deleting real user data.
+      if [ "$kind" = "symlink" ] && [ -d "$path" ] && [ ! -L "$path" ]; then
+        warn "not removing $path: recorded as symlink but is a directory"
+        continue
+      fi
+      if [ "$kind" = "dir" ] && [ ! -L "$path" ]; then
+        rm -rf -- "$path" || warn "could not remove $path"
+      else
+        rm -f -- "$path" || warn "could not remove $path"
+      fi
     done
   fi
 
   if [ -f "$ORIG" ]; then
     tac "$ORIG" 2>/dev/null | while IFS=$'\t' read -r path how; do
       [ -n "$path" ] || continue
+      real="$(realpath -m -- "$path" 2>/dev/null || printf '%s' "$path")"
+      case "$real" in "$HOME"/*) ;; *) warn "refusing to restore $path"; continue ;; esac
       if [ "$how" = "backup" ]; then
         key="$(printf '%s' "$path" | sed 's|/|__|g')"
         [ -e "$ORIGINALS/$key" ] || continue
         mkdir -p -- "$(dirname -- "$path")"
         rm -rf -- "$path"
-        cp -a -- "$ORIGINALS/$key" "$path"
+        cp -a -- "$ORIGINALS/$key" "$path" || warn "could not restore $path"
       elif [ "$how" = "absent" ]; then
         if [ -L "$path" ] || [ -f "$path" ]; then rm -f -- "$path"; fi
       fi
     done
   fi
 
-  # Breeze defaults, without re-laying-out the restored panel.
-  kwriteconfig6 --file kdeglobals --group General --key ColorScheme BreezeDark
-  kwriteconfig6 --file kdeglobals --group General --key LookAndFeelPackage org.kde.breeze.desktop
-  kwriteconfig6 --file kdeglobals --group Icons --key Theme breeze
-  kwriteconfig6 --file kdeglobals --group General --key font "Noto Sans,10,-1,5,50,0,0,0,0,0"
-  kwriteconfig6 --file kdeglobals --group General --key fixed "Hack,10,-1,5,50,0,0,0,0,0"
-  kwriteconfig6 --file kdeglobals --group General --key menuFont "Noto Sans,10,-1,5,50,0,0,0,0,0"
-  kwriteconfig6 --file kdeglobals --group General --key toolBarFont "Noto Sans,10,-1,5,50,0,0,0,0,0"
-  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key theme Breeze
-  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key library org.kde.breeze
-  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key BorderSizeAuto true
-  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnLeft ""
-  kwriteconfig6 --file kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight IAX
-  for e in blur glide magiclamp slidingpopups squash wobblywindows; do
-    kwriteconfig6 --file kwinrc --group Plugins --key "${e}Enabled" false
-  done
+  # kdeglobals and kwinrc are restored from their originals above; do not
+  # overwrite the user's pre-rice look with hardcoded Breeze values.
   have kbuildsycoca6 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
   have bat && bat cache --build >/dev/null 2>&1 || true
-  have plasma-apply-wallpaperimage && plasma-apply-wallpaperimage -f preserveAspectCrop /usr/share/wallpapers/cachyos-wallpapers/north.png >/dev/null 2>&1 || true
-  systemctl --user restart plasma-plasmashell >/dev/null 2>&1 || true
+  systemctl --user start plasma-plasmashell >/dev/null 2>&1 || true
   qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true
+  trap - EXIT
   sleep 2
   ok "user-level Sugar Plum removed"
   warn "log out/in for shortcuts; run ./install.sh --system --revert for login + Limine"
@@ -537,10 +585,10 @@ case "${1:-apply}" in
   apply|--apply)
     apply_kde
     apply_shells
+    "$REPO/bin/desktop-icons" apply || warn "desktop icon pass skipped"
     apply_panel
     apply_wallpaper
     apply_scripts
-    "$REPO/bin/desktop-icons" apply || warn "desktop icon pass skipped"
     ok "Sugar Plum applied"
     warn "log out/in to activate the screenshot shortcuts"
     if [ -e "$REPO/state/system-applied" ]; then

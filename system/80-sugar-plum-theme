@@ -15,17 +15,55 @@ THEME="$ESP/sugar-plum/limine-theme.conf"
 [ -f "$THEME" ] || exit 0
 
 python3 - "$CONF" "$THEME" <<'PY'
-import sys, pathlib
+import os
+import pathlib
+import sys
+import tempfile
+
 conf = pathlib.Path(sys.argv[1])
 theme = pathlib.Path(sys.argv[2])
 text = conf.read_text()
 start, end = "# >>> sugar-plum >>>", "# <<< sugar-plum <<<"
-if start in text and end in text:
+
+# Remove any previous block, including a half-written one.
+while start in text and end in text:
     a = text.index(start)
     b = text.index(end, a) + len(end)
-    text = (text[:a] + text[b:]).lstrip("\n")
-block = start + "\n" + theme.read_text().rstrip("\n") + "\n" + end + "\n"
-conf.write_text(block + "\n" + text.lstrip("\n"))
+    text = text[:a] + text[b:]
+
+lines = [line for line in text.splitlines() if line.strip() not in (start, end)]
+cut = next((i for i, line in enumerate(lines) if line.startswith("/")), len(lines))
+glob, entries = lines[:cut], lines[cut:]
+
+# The old CachyOS theme sets the same keys after the block; remove them so
+# only one theme is present. Keep boot settings and comments.
+cosmetic = ("wallpaper:", "wallpaper_style:", "backdrop:", "interface_", "term_")
+glob = [
+    line for line in glob
+    if not line.startswith(cosmetic) and not line.lstrip().startswith(cosmetic)
+]
+
+block = start + "\n" + theme.read_text().rstrip("\n") + "\n" + end
+new = "\n".join(glob).rstrip("\n")
+new = (new + "\n\n" if new else "") + block + "\n"
+if entries:
+    new += "\n" + "\n".join(entries).rstrip("\n") + "\n"
+
+# Atomic replace, preserving the file mode.
+fd, tmp = tempfile.mkstemp(prefix=".limine-", dir=str(conf.parent))
+try:
+    with os.fdopen(fd, "w") as f:
+        f.write(new)
+        f.flush()
+        os.fsync(f.fileno())
+    os.chmod(tmp, conf.stat().st_mode)
+    os.replace(tmp, conf)
+except BaseException:
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    raise
 PY
 
 if grep -q '^ENABLE_ENROLL_LIMINE_CONFIG=yes' /etc/default/limine 2>/dev/null; then
