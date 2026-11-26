@@ -120,6 +120,9 @@ their upstream licenses.
 
 Published at <https://github.com/0V3RR1DE0/sugar-plum>.
 
+Each release also carries a clone-ready bundle:
+<https://github.com/0V3RR1DE0/sugar-plum/releases/latest>.
+
 On another machine:
 
 ```sh
