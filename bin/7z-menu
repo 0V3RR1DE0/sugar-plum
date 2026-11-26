@@ -28,11 +28,15 @@ fail() {
   echo "✗ $*"
   notify -u critical -i dialog-error "Archive failed" "$*"
   echo
-  read -r -p "Press Enter to close…" _ || true
+  # KIO may launch this without a tty; never block the worker on read.
+  if [ -t 0 ]; then
+    read -r -p "Press Enter to close…" _ || true
+  fi
   exit 1
 }
 
 ask_pass() {
+  have zenity || fail "zenity is required for password prompts."
   local p1 p2
   p1="$(zenity --password --title="Archive password" 2>/dev/null)" || return 1
   [ -n "$p1" ] || return 1
@@ -64,13 +68,42 @@ unique_out() {
   printf '%s' "$out"
 }
 
+safe_archive() {
+  local a="$1" list=""
+  case "${a,,}" in
+    *.tar|*.tar.gz|*.tgz|*.tar.xz|*.txz|*.tar.zst|*.tar.bz2|*.tbz2)
+      list="$(tar -tf "$a" 2>/dev/null)" || return 0
+      ;;
+    *.rar)
+      if have unrar; then
+        list="$(unrar lb "$a" 2>/dev/null)" || return 0
+      else
+        list="$(7z l -slt -ba "$a" 2>/dev/null | sed -n 's/^Path = //p')" || return 0
+      fi
+      ;;
+    *)
+      list="$(7z l -slt -ba "$a" 2>/dev/null | sed -n 's/^Path = //p')" || return 0
+      ;;
+  esac
+  # Reject absolute paths and parent-directory traversal.
+  printf '%s\n' "$list" | grep -qE '(^/|(^|/)\.\.(/|$))' && return 1
+  return 0
+}
+
 compress() {
   local fmt="$1" want_pass="$2"; shift 2
   local -a src=("$@")
   [ "${#src[@]}" -gt 0 ] || fail "Nothing selected."
 
+  have 7z || fail "7z is not installed."
   local first dir base ext="7z" pass=""
-  first="$(readlink -f -- "${src[0]}")"
+  local -a abs=()
+  local f
+  for f in "${src[@]}"; do
+    [ -e "$f" ] || fail "Not found: $f"
+    abs+=("$(readlink -f -- "$f")")
+  done
+  first="${abs[0]}"
   dir="$(dirname -- "$first")"
   base="$(basename -- "$first")"
   if [ "${#src[@]}" -eq 1 ] && [ ! -d "$first" ]; then
@@ -80,6 +113,11 @@ compress() {
     [ "$base" = "/" ] && base="Archive"
   fi
   [ -n "$base" ] || base="Archive"
+  # All selected items must share a directory, or the basename list points at
+  # files that do not exist from the chosen working directory.
+  for f in "${abs[@]}"; do
+    [ "$(dirname -- "$f")" = "$dir" ] || fail "Select items from one folder."
+  done
 
   case "$fmt" in
     7z) ext="7z" ;;
@@ -95,8 +133,7 @@ compress() {
 
   local out; out="$(unique_out "$dir" "$base" "$ext")"
   local -a names=()
-  local f
-  for f in "${src[@]}"; do names+=("$(basename -- "$f")"); done
+  for f in "${abs[@]}"; do names+=("$(basename -- "$f")"); done
 
   echo "→ ${base}.${ext}"
   notify "Compressing" "${base}.${ext}"
@@ -125,6 +162,7 @@ extract() {
   local where="$1" want_pass="$2"; shift 2
   local -a src=("$@")
   [ "${#src[@]}" -gt 0 ] || fail "Nothing selected."
+  have 7z || fail "7z is not installed."
 
   local pass=""
   if [ "$want_pass" = "1" ]; then
@@ -146,6 +184,7 @@ extract() {
     else
       out="$dir"
     fi
+    safe_archive "$a" || fail "Archive contains absolute or parent-relative paths: $base."
     mkdir -p -- "$out" || fail "Could not create $out."
 
     echo "→ extracting $base to $out"
@@ -153,10 +192,15 @@ extract() {
 
     case "${base,,}" in
       *.rar)
+        local -a rargs=(x -o- -y)
+        [ -n "$pass" ] && rargs+=(-p"$pass")
         if have unrar; then
-          unrar x -o- -y ${pass:+-p"$pass"} "$a" "$out/" || fail "unrar failed on $base."
+          unrar "${rargs[@]}" "$a" "$out/" || fail "unrar failed on $base."
         else
-          7z x -bsp1 -aos -y ${pass:+-p"$pass"} -o"$out" -- "$a" || fail "7z failed on $base."
+          local -a zargs=(x -bsp1 -aos -y)
+          [ -n "$pass" ] && zargs+=(-p"$pass")
+          zargs+=(-o"$out" -- "$a")
+          7z "${zargs[@]}" || fail "7z failed on $base."
         fi
         ;;
       *.tar.gz|*.tgz)   tar -xzvf "$a" -C "$out" || fail "tar failed on $base." ;;
@@ -165,7 +209,10 @@ extract() {
       *.tar.bz2|*.tbz2) tar -xjvf "$a" -C "$out" || fail "tar failed on $base." ;;
       *.tar)            tar -xvf "$a" -C "$out" || fail "tar failed on $base." ;;
       *)
-        7z x -bsp1 -aos -y ${pass:+-p"$pass"} -o"$out" -- "$a" || fail "7z failed on $base."
+        local -a zargs=(x -bsp1 -aos -y)
+        [ -n "$pass" ] && zargs+=(-p"$pass")
+        zargs+=(-o"$out" -- "$a")
+        7z "${zargs[@]}" || fail "7z failed on $base."
         ;;
     esac
   done

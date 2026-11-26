@@ -4,32 +4,79 @@ set -uo pipefail
 
 mode="${1:-region}"
 dir="$HOME/Pictures/Screenshots"
-mkdir -p "$dir"
-file="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"
+state_dir="$HOME/.local/state/sugar-plum"
+log="$state_dir/screenshot.log"
+mkdir -p "$dir" "$state_dir"
+file="$dir/$(date +%Y-%m-%d_%H-%M-%S_%3N).png"
+tmp_err="$(mktemp)"
+trap 'rm -f "$tmp_err"' EXIT
+
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$log"; }
+notify() {
+  local title="$1" icon="${2:-camera-photo}" body="${3:-}"
+  notify-send -a "Sugar Plum" -i "$icon" "$title" "$body" >/dev/null 2>&1 || true
+}
+
+command -v spectacle >/dev/null 2>&1 || {
+  log "spectacle not found"
+  notify "Screenshot failed" dialog-error "spectacle is not installed"
+  exit 1
+}
 
 case "$mode" in
-  region) spectacle -r -b -n -o "$file" >/dev/null 2>&1 ;;
-  full)   spectacle -f -b -n -o "$file" >/dev/null 2>&1 ;;
-  window) spectacle -a -b -n -o "$file" >/dev/null 2>&1 ;;
-  *) exit 1 ;;
+  region) args=(-r) ;;
+  full)   args=(-f) ;;
+  window) args=(-a) ;;
+  *)
+    log "unknown mode: $mode"
+    notify "Screenshot failed" dialog-error "Unknown mode: $mode"
+    exit 1
+    ;;
 esac
 
-# Cancelled, or the capture failed.
-[ -s "$file" ] || exit 0
-
-satty_bin="$(command -v satty || true)"
-if [ -z "$satty_bin" ]; then
-  notify-send -a "Sugar Plum" -i "$file" "Screenshot saved" "$file" 2>/dev/null || true
+log "capture mode=$mode file=$file"
+spectacle "${args[@]}" -b -n -o "$file" 2>"$tmp_err"
+rc=$?
+if [ ! -s "$file" ]; then
+  log "capture returned $rc, no file"
+  if grep -qiE 'error|failed|could not|not available' "$tmp_err"; then
+    tail -n 5 "$tmp_err" >>"$log"
+    notify "Screenshot failed" dialog-error "$(tail -n 1 "$tmp_err")"
+  fi
+  # A cancelled region selection is indistinguishable from a failed one;
+  # stay silent and leave the log entry rather than capture something unexpected.
   exit 0
 fi
 
+# Hold the clipboard promise even if satty is missing or cancelled.
+if command -v wl-copy >/dev/null 2>&1; then
+  wl-copy <"$file" >/dev/null 2>&1 || log "wl-copy failed"
+fi
+
+satty_bin="$(command -v satty || true)"
+if [ -z "$satty_bin" ]; then
+  log "satty not found; saved raw capture"
+  notify "Screenshot saved" camera-photo "$file"
+  exit 0
+fi
+
+edited="${file%.png}.edited.png"
 "$satty_bin" \
   --filename "$file" \
-  --output-filename "$file" \
+  --output-filename "$edited" \
   --copy-command wl-copy \
   --save-after-copy \
   --actions-on-enter save-to-clipboard \
   --early-exit copy \
-  >/dev/null 2>&1 || true
+  >>"$log" 2>&1
+rc=$?
 
-notify-send -a "Sugar Plum" -i "$file" "Screenshot saved" "$file" 2>/dev/null || true
+if [ -s "$edited" ]; then
+  mv -f "$edited" "$file"
+  log "satty saved rc=$rc"
+  notify "Screenshot saved" camera-photo "$file"
+else
+  rm -f "$edited"
+  log "satty closed rc=$rc; raw capture kept"
+  notify "Screenshot saved (unannotated)" camera-photo "$file"
+fi

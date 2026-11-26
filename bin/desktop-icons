@@ -113,15 +113,25 @@ apply_desktop() {
       chmod 755 "$f"
     fi
     if [ -n "$dest" ]; then
-      sed -i "s|^Icon=.*|Icon=$dest|" "$f"
+      # Replace only the [Desktop Entry] icon, not [Desktop Action ...] icons.
+      python3 - "$f" "$dest" <<'PY'
+import sys, pathlib
+p, dest = sys.argv[1:3]
+lines = pathlib.Path(p).read_text(errors="replace").splitlines()
+start = next((i for i, line in enumerate(lines) if line.strip() == "[Desktop Entry]"), 0)
+for i in range(start, len(lines)):
+    if i > start and lines[i].startswith("["):
+        break
+    if lines[i].startswith("Icon="):
+        lines[i] = "Icon=" + dest
+        break
+pathlib.Path(p).write_text("\n".join(lines) + "\n")
+PY
     fi
     say "$(basename "$f") → ${dest:-unchanged icon}"
   done
   command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
-  # Plasma caches Folder View QIcons; restart it so the new files are used.
-  if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active plasma-plasmashell >/dev/null 2>&1; then
-    systemctl --user restart plasma-plasmashell >/dev/null 2>&1 || true
-  fi
+  # The installer restarts plasmashell after this pass; do not tear it down here.
   ok "desktop icons translucent, shortcut arrows hidden"
 }
 

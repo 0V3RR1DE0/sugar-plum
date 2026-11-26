@@ -4,6 +4,7 @@ import sys
 import os
 import subprocess
 import shutil
+import tempfile
 
 from PySide6.QtWidgets import (
     QApplication, QDialog, QVBoxLayout, QHBoxLayout,
@@ -310,9 +311,16 @@ class ArchiveDialog(QDialog):
                 args.append(f"-v{volume}")
             args += [output, *FILES]
         elif fmt in ("tar.gz", "tar.xz", "tar.bz2"):
-            tmp = output + ".tmp.tar"
+            fd, tmp = tempfile.mkstemp(prefix=".sugar-7z-", suffix=".tar",
+                                       dir=os.path.dirname(output) or ".")
+            os.close(fd)
+            os.remove(tmp)
             result = subprocess.run(["7z", "a", "-ttar", tmp, *FILES], capture_output=True)
             if result.returncode != 0:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
                 QMessageBox.critical(self, "7-Zip", "Failed to create intermediate TAR.")
                 return None, []
             cleanup.append(tmp)
