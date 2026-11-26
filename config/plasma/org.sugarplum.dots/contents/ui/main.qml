@@ -15,10 +15,18 @@ PlasmoidItem {
     readonly property var pinned: Plasmoid.configuration.Launchers || []
 
     property bool dragActive: false
+    property bool dragSnapping: false
     property int dragIndex: -1
+    property int dragTargetIndex: -1
     property var dragIcon
     property real dragX: 0
     property real dragY: 0
+
+    Timer {
+        id: dropTimer
+        interval: 130
+        onTriggered: root.finishDrop()
+    }
 
     readonly property int taskCount: Math.max(1, taskModel.count)
     readonly property int slotSize: Math.max(22, Math.min(36, Math.floor((width - 16) / taskCount) - 2))
@@ -76,6 +84,19 @@ PlasmoidItem {
         savePinned(list)
     }
 
+    function finishDrop() {
+        if (!dragActive) {
+            return
+        }
+        var from = dragIndex
+        var target = dragTargetIndex
+        dragActive = false
+        dragSnapping = false
+        dragIndex = -1
+        dragTargetIndex = -1
+        finishDrag(from, target)
+    }
+
     function finishDrag(from, target) {
         if (from < 0 || target < 0 || from === target) {
             return
@@ -130,7 +151,7 @@ PlasmoidItem {
                         id: taskItem
                         width: root.slotSize
                         height: root.slotSize
-                        active: taskItem.open && taskMenu.status !== PlasmaExtras.Menu.Open
+                        active: taskItem.open && !root.dragActive && taskMenu.status !== PlasmaExtras.Menu.Open
                         interactive: true
                         location: Plasmoid.location
                         timeout: -1
@@ -164,6 +185,7 @@ PlasmoidItem {
                         property var iconSource: taskItem.pinnedByList && taskItem.appId.length > 0
                             ? taskItem.appId
                             : model.decoration
+                        property bool dragSource: root.dragActive && root.dragIndex === taskItem.taskIndex
 
                         function childIndex(row) {
                             return taskModel.makeModelIndex(taskItem.taskIndex, row)
@@ -308,6 +330,7 @@ PlasmoidItem {
                             anchors.fill: parent
                             anchors.margins: 2
                             radius: 10
+                            opacity: taskItem.dragSource ? 0.25 : 1.0
                             color: taskItem.taskActive
                                 ? Qt.rgba(1.0, 0.70, 0.85, 0.14)
                                 : (taskItem.containsMouse ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
@@ -321,7 +344,7 @@ PlasmoidItem {
                             source: taskItem.pinnedByList && taskItem.appId.length > 0 ? taskItem.appId : ""
                             visible: valid
                             smooth: true
-                            opacity: taskItem.minimized ? 0.5 : 1.0
+                            opacity: taskItem.dragSource ? 0.18 : (taskItem.minimized ? 0.5 : 1.0)
                         }
 
                         Kirigami.Icon {
@@ -331,7 +354,7 @@ PlasmoidItem {
                             source: model.decoration
                             visible: !themedIcon.valid
                             smooth: true
-                            opacity: taskItem.minimized ? 0.5 : 1.0
+                            opacity: taskItem.dragSource ? 0.18 : (taskItem.minimized ? 0.5 : 1.0)
                         }
 
                         Rectangle {
@@ -341,6 +364,7 @@ PlasmoidItem {
                             width: Math.max(12, Math.round(root.slotSize * 0.5))
                             height: Math.max(6, Math.round(root.slotSize * 0.22))
                             radius: height / 2
+                            opacity: taskItem.dragSource ? 0.18 : 1.0
                             color: Qt.rgba(0.10, 0.09, 0.14, 0.88)
 
                             Row {
@@ -443,8 +467,17 @@ PlasmoidItem {
                             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
 
                             property bool dragging: false
+                            property bool dragAllowed: false
                             property real pressX: 0
                             property real pressY: 0
+
+                            function clampTarget(index) {
+                                var pinnedCount = Math.min(root.pinned.length, taskModel.count)
+                                if (taskItem.isPinned) {
+                                    return Math.max(0, Math.min(pinnedCount - 1, index))
+                                }
+                                return Math.max(pinnedCount, Math.min(taskModel.count - 1, index))
+                            }
 
                             function doClick(button) {
                                 taskItem.hideImmediately()
@@ -477,7 +510,7 @@ PlasmoidItem {
                             }
 
                             function updateDrag() {
-                                if (!mouseArea.pressed) {
+                                if (!mouseArea.pressed || !dragAllowed) {
                                     return
                                 }
                                 var p = mouseArea.mapToItem(fullRoot, mouseArea.mouseX, mouseArea.mouseY)
@@ -492,13 +525,21 @@ PlasmoidItem {
                                 if (dragging) {
                                     root.dragX = p.x
                                     root.dragY = p.y
+                                    var pApps = mouseArea.mapToItem(apps, mouseArea.mouseX, mouseArea.mouseY)
+                                    var slot = Math.floor(pApps.x / (root.slotSize + apps.spacing))
+                                    root.dragTargetIndex = clampTarget(slot)
                                 }
                             }
 
                             onPressed: (mouse) => {
+                                if (root.dragSnapping) {
+                                    return
+                                }
                                 var p = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
+                                dragAllowed = mouse.button === Qt.LeftButton
                                 pressX = p.x
                                 pressY = p.y
+                                root.dragTargetIndex = -1
                                 dragging = false
                             }
 
@@ -508,22 +549,30 @@ PlasmoidItem {
                             onReleased: (mouse) => {
                                 if (dragging) {
                                     var p = mouseArea.mapToItem(apps, mouseArea.mouseX, mouseArea.mouseY)
-                                    var target = Math.floor(p.x / (root.slotSize + 2))
-                                    target = Math.max(0, Math.min(taskModel.count - 1, target))
-                                    var from = root.dragIndex
-                                    root.dragActive = false
-                                    root.dragIndex = -1
+                                    var target = clampTarget(Math.floor(p.x / (root.slotSize + apps.spacing)))
+                                    root.dragTargetIndex = target
+                                    root.dragSnapping = true
+                                    var center = apps.mapToItem(fullRoot,
+                                        target * (root.slotSize + apps.spacing) + root.slotSize / 2,
+                                        root.slotSize / 2)
+                                    root.dragX = center.x
+                                    root.dragY = center.y
+                                    dropTimer.restart()
                                     dragging = false
-                                    root.finishDrag(from, target)
                                     return
                                 }
-                                doClick(mouse.button)
+                                if (!root.dragSnapping) {
+                                    doClick(mouse.button)
+                                }
                             }
 
                             onCanceled: {
+                                dropTimer.stop()
                                 dragging = false
                                 root.dragActive = false
+                                root.dragSnapping = false
                                 root.dragIndex = -1
+                                root.dragTargetIndex = -1
                             }
                         }
                     }
@@ -535,16 +584,47 @@ PlasmoidItem {
             }
         }
 
-        Kirigami.Icon {
+        Rectangle {
+            id: dropIndicator
+            visible: root.dragActive && !root.dragSnapping && root.dragTargetIndex >= 0
+            x: apps.x + root.dragTargetIndex * (root.slotSize + apps.spacing)
+            y: 0
+            width: root.slotSize
+            height: root.slotSize
+            radius: 10
+            color: Qt.rgba(1, 1, 1, 0.035)
+            border.width: 1
+            border.color: Qt.rgba(1.0, 0.70, 0.85, 0.55)
+            z: 1
+        }
+
+        Item {
             id: dragGhost
             visible: root.dragActive
-            width: root.iconPx
-            height: root.iconPx
-            source: root.dragIcon
+            width: root.slotSize + 6
+            height: width
             x: root.dragX - width / 2
             y: root.dragY - height / 2
             z: 100
-            opacity: 0.85
+
+            Behavior on x { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+            Behavior on y { NumberAnimation { duration: 110; easing.type: Easing.OutCubic } }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 10
+                color: Qt.rgba(0.07, 0.06, 0.11, 0.78)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.14)
+            }
+
+            Kirigami.Icon {
+                anchors.centerIn: parent
+                width: Math.round(root.iconPx * 1.15)
+                height: width
+                source: root.dragIcon
+                smooth: true
+            }
         }
     }
 }
