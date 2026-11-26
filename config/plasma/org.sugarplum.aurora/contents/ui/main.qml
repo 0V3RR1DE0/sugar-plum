@@ -19,7 +19,7 @@ WallpaperItem {
         ? Qt.rect(Window.window.x, Window.window.y, Window.window.width, Window.window.height)
         : Qt.rect(0, 0, 0, 0)
     readonly property bool paused: pauseOnCover
-        && (activeWindowMonitor.count > 0 || coverage > 0.8)
+        && (activeWindowMonitor.count > 0 || coverage > 0.6)
         && !KWindowSystem.showingDesktop
 
     property real phase: 0
@@ -58,10 +58,11 @@ WallpaperItem {
     }
 
     Timer {
-        interval: 16
+        // Lower speeds also lower the repaint rate; phase stays time-correct.
+        interval: Math.max(16, Math.round(16 / Math.max(0.1, wallpaper.speed)))
         repeat: true
-        running: !wallpaper.paused && wallpaper.visible
-        onTriggered: wallpaper.phase += 0.016 * wallpaper.speed
+        running: !wallpaper.paused && wallpaper.visible && wallpaper.speed > 0
+        onTriggered: wallpaper.phase = (wallpaper.phase + (interval / 1000) * wallpaper.speed) % 1000
     }
 
     ShaderEffect {
@@ -93,10 +94,15 @@ WallpaperItem {
             if (!g || g.width <= 0 || g.height <= 0) {
                 continue
             }
-            var x1 = Math.max(0, g.x)
-            var y1 = Math.max(0, g.y)
-            var x2 = Math.min(sw, g.x + g.width)
-            var y2 = Math.min(sh, g.y + g.height)
+            // Geometry is global; offset it into this wallpaper's screen.
+            var ox = wallpaper.desktopRect.x
+            var oy = wallpaper.desktopRect.y
+            var gx = g.x - ox
+            var gy = g.y - oy
+            var x1 = Math.max(0, gx)
+            var y1 = Math.max(0, gy)
+            var x2 = Math.min(sw, gx + g.width)
+            var y2 = Math.min(sh, gy + g.height)
             if (x2 > x1 && y2 > y1) {
                 area += (x2 - x1) * (y2 - y1)
             }

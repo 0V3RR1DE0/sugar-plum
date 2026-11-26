@@ -29,7 +29,9 @@ PlasmoidItem {
     }
 
     readonly property int taskCount: Math.max(1, taskModel.count)
-    readonly property int slotSize: Math.max(22, Math.min(36, Math.floor((width - 16) / taskCount) - 2))
+    // Fixed budget, not the applet width: width depends on apps.implicitWidth,
+    // which depends on slotSize, which caused an unstable shrink loop.
+    readonly property int slotSize: Math.max(22, Math.min(36, Math.floor(1500 / taskCount) - 2))
     readonly property int iconPx: Math.max(16, Math.min(26, Math.round(slotSize * 0.68)))
 
     TaskManager.TasksModel {
@@ -179,13 +181,16 @@ PlasmoidItem {
                             return false
                         }
                         property bool isPinned: model.IsLauncher === true || taskItem.pinnedByList
-                        property string launcherUrl: taskItem.rawLauncherUrl.length > 0
-                            ? taskItem.rawLauncherUrl
-                            : (taskItem.appId.length > 0 ? "applications:" + taskItem.appId + ".desktop" : "")
+                        // Never synthesise a launcher URL: appId is not always a
+                        // .desktop basename (Steam games, plasmashell, Electron).
+                        property string launcherUrl: taskItem.rawLauncherUrl
                         property var iconSource: taskItem.pinnedByList && taskItem.appId.length > 0
                             ? taskItem.appId
                             : model.decoration
                         property bool dragSource: root.dragActive && root.dragIndex === taskItem.taskIndex
+
+                        Accessible.role: Accessible.Button
+                        Accessible.name: String(model.display || "")
 
                         function childIndex(row) {
                             return taskModel.makeModelIndex(taskItem.taskIndex, row)
@@ -219,6 +224,38 @@ PlasmoidItem {
                             return best
                         }
 
+                        // Act on the actual window, never on a group parent:
+                        // group-parent IsActive/IsMinimized do not reliably
+                        // reflect the child, which made single-window groups
+                        // ignore clicks.
+                        function targetIndex() {
+                            if (taskItem.childCount > 0) {
+                                var row = taskItem.activeChild()
+                                if (row < 0) row = taskItem.mostRecentChild()
+                                if (row < 0) row = 0
+                                return taskItem.childIndex(row)
+                            }
+                            return taskModel.index(taskItem.taskIndex, 0)
+                        }
+                        function targetMinimized() {
+                            return taskModel.data(taskItem.targetIndex(), TaskManager.AbstractTasksModel.IsMinimized) === true
+                        }
+                        function targetMaximized() {
+                            return taskModel.data(taskItem.targetIndex(), TaskManager.AbstractTasksModel.IsMaximized) === true
+                        }
+                        function targetFullScreen() {
+                            return taskModel.data(taskItem.targetIndex(), TaskManager.AbstractTasksModel.IsFullScreen) === true
+                        }
+
+                        Component.onDestruction: {
+                            if (root.dragActive && root.dragIndex === taskItem.taskIndex) {
+                                root.dragActive = false
+                                root.dragSnapping = false
+                                root.dragIndex = -1
+                                root.dragTargetIndex = -1
+                            }
+                        }
+
                         mainItem: Flickable {
                             id: previewFlick
                             implicitWidth: 380
@@ -247,6 +284,8 @@ PlasmoidItem {
                                             ? String(taskItem.winIdList[index])
                                             : (taskItem.winIdList && taskItem.winIdList.length ? String(taskItem.winIdList[0]) : "")
                                         property bool rowActive: taskModel.data(childIdx, TaskManager.AbstractTasksModel.IsActive) === true
+                                        property bool rowMinimized: taskModel.data(childIdx, TaskManager.AbstractTasksModel.IsMinimized) === true
+                                        property bool rowHidden: taskModel.data(childIdx, TaskManager.TasksModel.IsHidden) === true
                                         property bool previewActive: taskItem.containsMouse || taskItem.tooltipOpen
 
                                         Rectangle {
@@ -275,7 +314,10 @@ PlasmoidItem {
 
                                             TaskManager.ScreencastingRequest {
                                                 id: screencast
-                                                uuid: windowRow.previewActive ? windowRow.winUuid : ""
+                                                uuid: windowRow.previewActive
+                                                    && !windowRow.rowMinimized
+                                                    && !windowRow.rowHidden
+                                                    ? windowRow.winUuid : ""
                                             }
 
                                             Loader {
@@ -416,29 +458,29 @@ PlasmoidItem {
                                 text: "Minimize"
                                 icon: "window-minimize"
                                 visible: taskItem.open
-                                enabled: !taskItem.minimized
-                                onClicked: taskModel.requestToggleMinimized(taskModel.index(taskItem.taskIndex, 0))
+                                enabled: !taskItem.targetMinimized()
+                                onClicked: taskModel.requestToggleMinimized(taskItem.targetIndex())
                             }
 
                             PlasmaExtras.MenuItem {
-                                text: taskItem.maximized ? "Restore" : "Maximize"
-                                icon: taskItem.maximized ? "window-restore" : "window-maximize"
+                                text: taskItem.targetMaximized() ? "Restore" : "Maximize"
+                                icon: taskItem.targetMaximized() ? "window-restore" : "window-maximize"
                                 visible: taskItem.open
-                                onClicked: taskModel.requestToggleMaximized(taskModel.index(taskItem.taskIndex, 0))
+                                onClicked: taskModel.requestToggleMaximized(taskItem.targetIndex())
                             }
 
                             PlasmaExtras.MenuItem {
                                 text: "Move"
                                 icon: "transform-move"
                                 visible: taskItem.open
-                                onClicked: taskModel.requestMove(taskModel.index(taskItem.taskIndex, 0))
+                                onClicked: taskModel.requestMove(taskItem.targetIndex())
                             }
 
                             PlasmaExtras.MenuItem {
                                 text: "Resize"
                                 icon: "transform-scale"
                                 visible: taskItem.open
-                                onClicked: taskModel.requestResize(taskModel.index(taskItem.taskIndex, 0))
+                                onClicked: taskModel.requestResize(taskItem.targetIndex())
                             }
 
                             PlasmaExtras.MenuItem {
@@ -446,8 +488,8 @@ PlasmoidItem {
                                 icon: "view-fullscreen"
                                 visible: taskItem.open
                                 checkable: true
-                                checked: taskItem.fullScreen
-                                onClicked: taskModel.requestToggleFullScreen(taskModel.index(taskItem.taskIndex, 0))
+                                checked: taskItem.targetFullScreen()
+                                onClicked: taskModel.requestToggleFullScreen(taskItem.targetIndex())
                             }
 
                             PlasmaExtras.MenuItem { separator: true }
@@ -456,7 +498,7 @@ PlasmoidItem {
                                 text: "Close"
                                 icon: "window-close"
                                 visible: taskItem.open
-                                onClicked: taskModel.requestClose(taskModel.index(taskItem.taskIndex, 0))
+                                onClicked: taskModel.requestClose(taskItem.targetIndex())
                             }
                         }
 
@@ -468,6 +510,7 @@ PlasmoidItem {
 
                             property bool dragging: false
                             property bool dragAllowed: false
+                            property bool pressAccepted: false
                             property real pressX: 0
                             property real pressY: 0
 
@@ -487,19 +530,36 @@ PlasmoidItem {
                                 }
                                 var idx = taskModel.index(taskItem.taskIndex, 0)
                                 if (button === Qt.MiddleButton) {
-                                    taskModel.requestClose(idx)
-                                } else if (taskItem.launcher && !taskItem.open) {
+                                    taskModel.requestClose(taskItem.targetIndex())
+                                    return
+                                }
+                                if (taskItem.launcher && !taskItem.open) {
                                     taskModel.requestNewInstance(idx)
-                                } else if (taskItem.childCount > 1) {
-                                    var current = taskItem.activeChild()
-                                    var next = current === -1 ? taskItem.mostRecentChild() : (current + 1) % taskItem.childCount
-                                    if (next < 0) next = 0
-                                    var nextIdx = taskItem.childIndex(next)
-                                    if (taskModel.data(nextIdx, TaskManager.AbstractTasksModel.IsMinimized)) {
-                                        taskModel.requestToggleMinimized(nextIdx)
+                                    return
+                                }
+                                if (taskItem.childCount > 0) {
+                                    var count = taskItem.childCount
+                                    var row = 0
+                                    if (count > 1) {
+                                        var current = taskItem.activeChild()
+                                        row = current === -1 ? taskItem.mostRecentChild() : (current + 1) % count
                                     }
-                                    taskModel.requestActivate(nextIdx)
-                                } else if (taskItem.minimized) {
+                                    if (row < 0) {
+                                        row = 0
+                                    }
+                                    var target = taskItem.childIndex(row)
+                                    if (taskModel.data(target, TaskManager.AbstractTasksModel.IsMinimized) === true) {
+                                        taskModel.requestToggleMinimized(target)
+                                        taskModel.requestActivate(target)
+                                    } else if (count === 1
+                                               && taskModel.data(target, TaskManager.AbstractTasksModel.IsActive) === true) {
+                                        taskModel.requestToggleMinimized(target)
+                                    } else {
+                                        taskModel.requestActivate(target)
+                                    }
+                                    return
+                                }
+                                if (taskItem.minimized) {
                                     taskModel.requestToggleMinimized(idx)
                                     taskModel.requestActivate(idx)
                                 } else if (taskItem.taskActive) {
@@ -532,9 +592,11 @@ PlasmoidItem {
                             }
 
                             onPressed: (mouse) => {
+                                pressAccepted = false
                                 if (root.dragSnapping) {
                                     return
                                 }
+                                pressAccepted = true
                                 var p = mouseArea.mapToItem(fullRoot, mouse.x, mouse.y)
                                 dragAllowed = mouse.button === Qt.LeftButton
                                 pressX = p.x
@@ -547,6 +609,10 @@ PlasmoidItem {
                             onMouseYChanged: updateDrag()
 
                             onReleased: (mouse) => {
+                                if (!pressAccepted) {
+                                    return
+                                }
+                                pressAccepted = false
                                 if (dragging) {
                                     var p = mouseArea.mapToItem(apps, mouseArea.mouseX, mouseArea.mouseY)
                                     var target = clampTarget(Math.floor(p.x / (root.slotSize + apps.spacing)))
@@ -568,6 +634,7 @@ PlasmoidItem {
 
                             onCanceled: {
                                 dropTimer.stop()
+                                pressAccepted = false
                                 dragging = false
                                 root.dragActive = false
                                 root.dragSnapping = false
